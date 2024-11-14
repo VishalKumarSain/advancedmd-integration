@@ -1,6 +1,8 @@
 const axios = require("axios");
+const { v4: uuidv4 } = require('uuid');
+
 const { get_advanced_md_token } = require("../helpers/access_token");
-const { checkOrCreatePatientInAbsoluteRX } = require("./absoluterxorder.controller");
+const { checkOrCreatePatientInAbsoluteRX, createOrderAbsoluteRXHelper } = require("./absoluterxorder.controller");
 const EHR_TEMPLATE = require("../models/ehrtemplates.model");
 const Failed_order = require("../models/order_failure.model");
 
@@ -142,7 +144,7 @@ const handlePatientData = async (note, token, template) => {
   
   //IF PATIENT NOT FOUND ON ADVANCEDMD THEN WE SAVE THE ERROR AND RETURN THE PROCESS
   if(!demographicResponse?.data?.PPMDResults?.Results?.patientlist?.patient){
-    console.log(`Patient not found on advancedmd of patientid - note["@patientid"]`);
+    // console.log(`Patient not found on advancedmd of patientid - note["@patientid"]`);
     
     const save_failed_order = await Failed_order.create(
       {
@@ -154,14 +156,18 @@ const handlePatientData = async (note, token, template) => {
     return
   }
   const patient = demographicResponse?.data?.PPMDResults?.Results?.patientlist?.patient;
-  console.log(" patient.contactinfo===", patient.contactinfo);
+  // console.log(" patient.contactinfo===", patient.contactinfo);
   
+   const numericPhoneNumber = patient.contactinfo["@homephone"].replace(/\D/g, "");
   const patientData = {
+    first_name :patient["@name"].split(",")[1], 
+    middle_name: "",
+    last_name : patient["@name"].split(",")[0],
     name: patient["@name"],
     email: patient.contactinfo["@email"],
-    phone_number: patient.contactinfo["@homephone"],
+    phone_number: numericPhoneNumber,
     dob: patient["@dob"],
-    gender: patient["@sex"],
+    gender: patient["@sex"] == "M" ? "Male" : "Female",
     address: {
       street: patient.address["@address1"],
       street2: patient.address["@address2"],
@@ -231,7 +237,7 @@ const handlePatientData = async (note, token, template) => {
   }
 
   const absoluteRxData = await checkOrCreatePatientInAbsoluteRX(patientData, template);
-  console.log("absoluteRxData====",absoluteRxData);
+  // console.log("absoluteRxData====",absoluteRxData);
   
   if(!absoluteRxData.status){
         // Optionally log or store the failed order in a database for further review
@@ -257,8 +263,9 @@ const handlePatientData = async (note, token, template) => {
 }
 
   const filteredData = note.pagelist.page.fieldlist.field.filter(
-    item => item['@name'] && !item['@name'].startsWith('Unitialed')
+    item => item['@name'] && !item['@name'].startsWith('Unititled')
   );
+  // console.log("filteredData====",filteredData);
   const physician_id =  filteredData.find(item => item['@name'] === 'provider_id')?.['@value'] || ''
   const ship_to_clinic=  filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1"
 
@@ -279,15 +286,27 @@ const handlePatientData = async (note, token, template) => {
     service_type: "two_day",
     signature_required: "1",
     memo: "Test memo",
-    external_id: "testing450",
-    products: products
+    external_id: uuidv4(),
+    products: products,
+    
   };
+
+
+  const additional_data = {
+    template_id : template.template_id,
+    note_id : note["@id"],
+    advancedmd_patient_id: note["@patientid"]
+  }
+  console.log("additional_data====",additional_data);
 
   console.log("orderPayload====",orderPayload);
   
-  return 
+  // return 
 
-  const create_order_url = `https://portal.absoluterx.com/api/clinics/orders?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
+  const order_res = await createOrderAbsoluteRXHelper(orderPayload, template, additional_data)
+  console.log("order_res====",order_res);
+
+  // const create_order_url = `https://portal.absoluterx.com/api/clinics/orders?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
   // const orderData = {
   //   patient_id: note["@patientid"],
   //   physician_id: "1931",
@@ -306,13 +325,13 @@ const handlePatientData = async (note, token, template) => {
   //     },
   //   ],
   // };
-  const response = await axios.post(create_order_url, orderPayload, {
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  // const response = await axios.post(create_order_url, orderPayload, {
+  //   headers: {
+  //     "Content-Type": "application/json",
+  //   },
+  // });
 
-  console.log("Order Payload:", orderPayload);
+  // console.log("Order Payload:", orderPayload);
 };
 
 
@@ -322,7 +341,7 @@ const extractProducts = (fields) => {
   const products = [];
   const productGroups = {};
 
-  fields.filter(field => field["@name"] && !field["@name"].startsWith("Unitialed")).forEach(field => {
+  fields.filter(field => field["@name"] && !field["@name"].startsWith("Unititled")).forEach(field => {
     const name = field["@name"];
     const value = field["@value"];
     const index = name.match(/_(\d+)$/)?.[1];
@@ -332,12 +351,12 @@ const extractProducts = (fields) => {
       if (name.includes("sku_no")) productGroups[index].sku = value;
       if (name.includes("quantity_no")) productGroups[index].quantity = value;
       if (name.includes("refill_no")) productGroups[index].refills = value || "0";
-      if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
+      // if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
     }
   });
 
   for (const index in productGroups) {
-    products.push({ ...productGroups[index], days_supply: "30" });
+    products.push({ ...productGroups[index], days_supply: "30" , sig : "Use as directed"});
   }
 
   return products;

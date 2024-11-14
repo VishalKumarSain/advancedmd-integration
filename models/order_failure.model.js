@@ -10,6 +10,10 @@ const failed_order_schema = new Schema(
       type: String,
       required: false,
     },
+    note_id: {
+      type: String,
+      required: false,
+    },
     failure_reason: {
       type: String,
       default: "",

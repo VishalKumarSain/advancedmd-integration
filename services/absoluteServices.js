@@ -2,7 +2,7 @@ const { AbsoluteOrderInfo } = require("../models/absoluteOrderHistry");
 
 exports.saveOrderInDatabse =async(data)=>{
     try{
-        return await AbsoluteOrderInfo.save(data)
+        return await AbsoluteOrderInfo.create(data)
     }catch(error){
     console.log("🚀 ~ error:", error)
 
