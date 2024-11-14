@@ -417,3 +417,41 @@ exports.createMedicationAbsolute = async (req, res) => {
     });
   }
 };
+exports.getBbsoluteOrder = async (req, res) => {
+  try {
+   const { physician_id, patient_id, order_number } = req.query;
+    if(!physician_id) throw new Error("physician id is required")
+    if(!patient_id) throw new Error("patient id is required")
+    if(!order_number) throw new Error("order number is required")
+    const queryParams = new URLSearchParams();
+    
+    // Add the API key as the first parameter
+    queryParams.append('api_key', process.env.ABSOLUTE_RX_API_KEY);
+    
+    // Conditionally add parameters if they exist
+     queryParams.append('physician_id', physician_id);
+     queryParams.append('patient_id', patient_id);
+     queryParams.append('number', order_number);
+    // Construct the full URL with query parameters
+    const baseUrl = 'https://portal.absoluterx.com/api/clinics/orders';
+    const url = `${baseUrl}?${queryParams.toString()}`;
+    
+    const response = await axios.get(url, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+     console.log("response",response.data.data[0])
+    return res.status(200).json({
+      status: true,
+      data: response.data.data[0],
+      message: "Successfully fetched order detail",
+    });
+  } catch (error) {
+    console.log("error==", error);
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+};

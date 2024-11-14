@@ -1,7 +1,7 @@
 const express = require("express");
 const { getPatient, getPatientAdvancedmd, getPatientMedication, getEhrNotes, getEhrTemplates, patientSearch, getEhrUpdatedNotes } = require("../controllers/advancedmd.controller");
 const { updateOrderStatus, updateOrderShipping, createOrder } = require("../controllers/lifefile.controller.js");
-const { createOrderAbsolute, createPhysicianAbsolute, createLicenseAbsolute, createAllergyAbsolute, createDiseasesAbsolute, createMedicationAbsolute, createPatientAbsolute, getPatientAbsolute, getPhysicianAbsolute } = require("../controllers/absoluterx.controller");
+const { createOrderAbsolute, createPhysicianAbsolute, createLicenseAbsolute, createAllergyAbsolute, createDiseasesAbsolute, createMedicationAbsolute, createPatientAbsolute, getPatientAbsolute, getPhysicianAbsolute, getBbsoluteOrder } = require("../controllers/absoluterx.controller");
 const { fullCreateOrderFlow } = require("../controllers/helper.controller");
 const { full_absolute_create_order_flow } = require("../controllers/newadvancedmd.controller.js");
 const router = express.Router();
@@ -55,6 +55,8 @@ router.post("/create-licenses", createLicenseAbsolute);
 router.post("/create-allergy", createAllergyAbsolute);
 router.post("/create-diseases", createDiseasesAbsolute);
 router.post("/create-medication", createMedicationAbsolute);
+// from absolute rx fetch order detail by  paitent id and order number
+router.get("/get-patient-order-details-from-absolute", getBbsoluteOrder);
 
 
 //LIFEFILE APIS
