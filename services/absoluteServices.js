@@ -24,3 +24,11 @@ exports.updateOrderInDatabse = async(query,data)=>{
 
     }
 } 
+exports.getAllOrderfromDatabaase = async(filter)=>{
+    try{
+      return await  AbsoluteOrderInfo.find({}).sort({_id:-1})
+    }catch(error){
+    console.log("🚀 ~ error:", error)
+
+    }
+} 
