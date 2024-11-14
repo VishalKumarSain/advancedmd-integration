@@ -1,8 +1,9 @@
 const express = require("express");
-const { getPatient, getPatientAdvancedmd, getPatientMedication, getEhrNotes, getEhrTemplates } = require("../controllers/advancedmd.controller");
+const { getPatient, getPatientAdvancedmd, getPatientMedication, getEhrNotes, getEhrTemplates, patientSearch, getEhrUpdatedNotes } = require("../controllers/advancedmd.controller");
 const { updateOrderStatus, updateOrderShipping, createOrder } = require("../controllers/lifefile.controller.js");
 const { createOrderAbsolute, createPhysicianAbsolute, createLicenseAbsolute, createAllergyAbsolute, createDiseasesAbsolute, createMedicationAbsolute, createPatientAbsolute, getPatientAbsolute, getPhysicianAbsolute } = require("../controllers/absoluterx.controller");
 const { fullCreateOrderFlow } = require("../controllers/helper.controller");
+const { full_absolute_create_order_flow } = require("../controllers/newadvancedmd.controller.js");
 const router = express.Router();
 
 //ADVANCEDMD APIS
@@ -14,9 +15,12 @@ router.get("/patient-medication/:patientId", getPatientMedication);
 router.get("/advancedmd-patient", getPatientAdvancedmd);
 router.get("/full-order-flow/:patientId", fullCreateOrderFlow);
 router.get("/ehrnotes", getEhrNotes);
+router.get("/ehrupdatednotes", getEhrUpdatedNotes);
 router.get("/ehrtemplates", getEhrTemplates);
+router.get("/patient-search", patientSearch);
 
 
+router.get("/advancedmd-flow", full_absolute_create_order_flow);
 
 // -PATIENT RESPONSE
 
