@@ -1,5 +1,6 @@
 const axios = require("axios");
 const { get_advanced_md_token } = require("../helpers/access_token");
+const { checkOrCreatePatientInAbsoluteRX } = require("./absoluterxorder.controller");
 
 exports.full_absolute_create_order_flow = async (req, res) => {
   try {
@@ -8,61 +9,104 @@ exports.full_absolute_create_order_flow = async (req, res) => {
     const token = "990039ea51d36d7a15450db403c53fffe7bc16dae7160aeb768b9fb61f47604173fcd3";
 
     // Prepare data for initial request
-    const get_ehr_data = JSON.stringify({
-      ppmdmsg: {
-        "@action": "getehrtemplates",
-        "@class": "api",
-        "@msgtime": new Date().toISOString(),
-        "@nocookie": "0",
-        template: {
-            "@templatename": "TemplateName",
-            "@templatetype": "TemplateType",
-            "@templatetypeid": "TemplateTypeID",
-            "@defaultcategory": "DefaultCategory",
-            "@defaultcategoryid": "DefaultCategoryID",
-            "@isactive": "IsActive"
-        },
-        page: {
-          "@pagename": "PageName",
-        },
-        field: {
-          "@fieldname": "FieldName",
-          "@defaultvalue": "DefaultValue",
-        },
+    // const get_ehr_data = JSON.stringify({
+    //   ppmdmsg: {
+    //     "@action": "getehrtemplates",
+    //     "@class": "api",
+    //     "@msgtime": new Date().toISOString(),
+    //     "@nocookie": "0",
+    //     template: {
+    //         "@templatename": "TemplateName",
+    //         "@templatetype": "TemplateType",
+    //         "@templatetypeid": "TemplateTypeID",
+    //         "@defaultcategory": "DefaultCategory",
+    //         "@defaultcategoryid": "DefaultCategoryID",
+    //         "@isactive": "IsActive"
+    //     },
+    //     page: {
+    //       "@pagename": "PageName",
+    //     },
+    //     field: {
+    //       "@fieldname": "FieldName",
+    //       "@defaultvalue": "DefaultValue",
+    //     },
+    //   },
+    // });
+
+    // // Config for AdvancedMD request
+    // const config = {
+    //   method: "post",
+    //   maxBodyLength: Infinity,
+    //   url: "https://providerapi.advancedmd.com/processrequest/api-801/TEMP/xmlrpc/processrequest.aspx",
+    //   headers: {
+    //     Cookie: `token=${token}`,
+    //     "Content-Type": "application/json",
+    //   },
+    //   data : get_ehr_data,
+    // };
+
+    // // Make initial API request to get template data
+    // const response = await axios.request(config);
+    // console.log("response.data.PPMDResults.Results.templatelist.template===",response.data.PPMDResults.Results.templatelist.template);
+
+    // const templates = response.data.PPMDResults.Results.templatelist.template.map(template => ({
+    //   id: template["@id"],
+    //   templatename: template["@templatename"],
+    //   templatetype: template["@templatetype"],
+    //   defaultcategory: template["@defaultcategory"],
+    //   isactive: template["@isactive"],
+    // }));
+
+
+    const templates = [
+      // {
+      //   id: '100026324',
+      //   templatename: 'Office Visit - Mobile',
+      //   templatetype: 'AMDS_Mobile',
+      //   defaultcategory: '',
+      //   isactive: '1'
+      // },
+      // {
+      //   id: '100044026',
+      //   templatename: 'AbsouteRx',
+      //   templatetype: 'Pharmacy Order',
+      //   defaultcategory: '',
+      //   isactive: '1'
+      // },
+      {
+        id: '100044027',
+        templatename: '# Absolute Rx',
+        templatetype: 'Pharmacy Order',
+        defaultcategory: '',
+        isactive: '1'
       },
-    });
-
-    // Config for AdvancedMD request
-    const config = {
-      method: "post",
-      maxBodyLength: Infinity,
-      url: "https://providerapi.advancedmd.com/processrequest/api-801/TEMP/xmlrpc/processrequest.aspx",
-      headers: {
-        Cookie: `token=${token}`,
-        "Content-Type": "application/json",
-      },
-      data : get_ehr_data,
-    };
-
-    // Make initial API request to get template data
-    const response = await axios.request(config);
-    console.log("response.data.PPMDResults.Results.templatelist.template===",response.data.PPMDResults.Results.templatelist.template);
-
-    const templates = response.data.PPMDResults.Results.templatelist.template.map(template => ({
-      id: template["@id"],
-      templatename: template["@templatename"],
-      templatetype: template["@templatetype"],
-      defaultcategory: template["@defaultcategory"],
-      isactive: template["@isactive"],
-    }));
-
-
+      // {
+      //   id: '100044028',
+      //   templatename: '# Hallandale Pharmacy',
+      //   templatetype: 'Pharmacy Order',
+      //   defaultcategory: '',
+      //   isactive: '1'
+      // },
+      // {
+      //   id: '100044032',
+      //   templatename: '# Spring Creek Pharmacy',
+      //   templatetype: 'Pharmacy Order',
+      //   defaultcategory: '',
+      //   isactive: '1'
+      // }
+    ]
     console.log("templates====",templates);
     
     
 
     // Process each template
     for (const template of templates) {
+
+
+      if(template.id =='100044027'){// THIS IS ABSOLUTERX TEMPLATEID
+        console.log("template====",template);
+      }
+      return
       await processTemplate(template, token);
     }
 
@@ -251,26 +295,7 @@ const handlePatientData = async (note, token) => {
   console.log("Order Payload:", orderPayload);
 };
 
-// Helper function to check or create patient in Absolute RX
-const checkOrCreatePatientInAbsoluteRX = async (patientData) => {
-  const url = `https://portal.absoluterx.com/api/clinics/patients?api_key=${process.env.ABSOLUTE_RX_API_KEY}&email=${patientData.email}`;
-  const existingPatient = await axios.get(url, { headers: { "Content-Type": "application/json" } });
 
-  console.log("existingPatient===",existingPatient?.data.data);
-
-  //TODO: 
-  
-  if (!existingPatient?.data?.data?.length) {
-    console.log("Inside if cond patient does not exists");
-    
-    const createPatientUrl = `https://portal.absoluterx.com/api/clinics/patients?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
-
-    //we will create patient
-    // await axios.post(createPatientUrl, patientData, {
-    //   headers: { "Content-Type": "application/json" },
-    // });
-  }
-};
 
 // Helper function to extract product data from fields
 const extractProducts = (fields) => {
