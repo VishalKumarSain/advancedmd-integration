@@ -6,16 +6,17 @@ const logger = require("morgan");
 const cors = require("cors");
 require("dotenv").config();
 const mongoose = require('mongoose');
-
+const DB =process.env.MONGODB_URI
+mongoose.connect(DB).then(() => console.log("MongoDB Database Connected", DB)).catch((err) => console.log(err));
 const index = require("./routes/index");
-const { connectDB } = require("./utils/db");
+// const { connectDB } = require("./utils/db");
 
 const app = express();
 app.use(cors());
 
 
 //DATABASE CONNECTIVITY
-connectDB()
+// connectDB()
 
 // view engine setup
 app.set("views", path.join(__dirname, "views"));
