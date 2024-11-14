@@ -557,7 +557,7 @@ exports.getEhrNotes = async (req,res) => {
 
 exports.getEhrTemplates = async (req, res) => {
   try {
-    // const token = await get_advanced_md_token();
+    const token = await get_advanced_md_token();
     const data = JSON.stringify({
       ppmdmsg: {
         "@action": "getehrtemplates",
@@ -596,7 +596,7 @@ exports.getEhrTemplates = async (req, res) => {
       maxBodyLength: Infinity,
       url: "https://providerapi.advancedmd.com/processrequest/api-801/TEMP/xmlrpc/processrequest.aspx",
       headers: {
-        Cookie: "token=990039f2eae4ecfe2f405ea0f760f36dec57e42f12dca025b80a26b424d69e1e4a7a8a",
+        Cookie: `token=${token}`,
         "Content-Type": "application/json",
       },
       data: data,
@@ -625,18 +625,19 @@ exports.getEhrTemplates = async (req, res) => {
     );
 
     // Loop through each template and check/add to the database
-    // for (const element of templates) {
-    //   const checkEhrTemplate = await EHR_TEMPLATE.findOne({
-    //     template_name: element.templatename,
-    //   });
-    //   if (!checkEhrTemplate) {
-    //     await EHR_TEMPLATE.create({
-    //       template_name: element.templatename,
-    //       template_type: element.templatetype,
-    //       template_id: element.id,
-    //     });
-    //   }
-    // }
+    for (const element of templates) {
+      const checkEhrTemplate = await EHR_TEMPLATE.findOne({
+        template_name: element.templatename,
+      });
+      if (!checkEhrTemplate) {
+        await EHR_TEMPLATE.create({
+          template_name: element.templatename,
+          template_type: element.templatetype,
+          template_id: element.id,
+          template_is_active : element.isactive =="1" ? true :false 
+        });
+      }
+    }
 
     // Send a successful response
     return res.status(200).json({ status: true, data: templates });
