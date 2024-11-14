@@ -14,7 +14,7 @@ var fs = require("fs");
  * Get port from environment and store in Express.
  */
 
-var port = normalizePort(process.env.PORT || '5000');
+var port = normalizePort(process.env.PORT || '3010');
 app.set('port', port);
 console.log("ADVANCEDMD APP LISTENING TO PORT ",port);
 
@@ -23,24 +23,24 @@ console.log("ADVANCEDMD APP LISTENING TO PORT ",port);
  * Create HTTP server.
  */
 
-var server = http.createServer(app);
-// var options = {
-// 	key: fs.readFileSync(
-// 		"/etc/letsencrypt/live/mypropex.donative.in/privkey.pem",
-// 		"utf8",
-// 	),
+//var server = http.createServer(app);
+options = {
+  key: fs.readFileSync(
+    "/etc/letsencrypt/live/q3.donative.in/privkey.pem",
+    "utf8"
+  ),
 
-// 	cert: fs.readFileSync(
-// 		"/etc/letsencrypt/live/mypropex.donative.in/cert.pem",
-// 		"utf8",
-// 	),
+  cert: fs.readFileSync(
+    "/etc/letsencrypt/live/q3.donative.in/cert.pem",
+    "utf8"
+  ),
 
-// 	ca: fs.readFileSync(
-// 		"/etc/letsencrypt/live/mypropex.donative.in/fullchain.pem",
-// 		"utf8",
-// 	),
-// };
-// var server = https.createServer(options, app);
+  ca: fs.readFileSync(
+    "/etc/letsencrypt/live/q3.donative.in/fullchain.pem",
+    "utf8"
+  ),
+  };
+var server = https.createServer(options, app);
 /**
  * Listen on provided port, on all network interfaces.
  */
