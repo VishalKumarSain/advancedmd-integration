@@ -81,7 +81,7 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
       return {
         status: false,
         data: null,
-        message: `Order already created on absoluterx not the given note id - ${additional_data.note_id}`,
+        message: `Order already created on absoluterx with the given note id - ${additional_data.note_id}`,
       };
     }
     const create_order_url = `https://portal.absoluterx.com/api/clinics/orders?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
