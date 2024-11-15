@@ -2,6 +2,10 @@ const { Schema, Types, model } = require("mongoose");
 
 const absolute_schema = new Schema(
   {
+    template_name: {
+      type: String,
+      required: true,
+    },
     frist_name: {
       type: String,
       required: true,

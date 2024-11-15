@@ -145,9 +145,6 @@ const processTemplate = async (template, token) => {
 // HELPER FUNCTION TO HANDLE PATIENT DATA PROCESSING
 const handlePatientData = async (note, token, template) => {
   try {
-    
-  
-
   // CHECK IF PATIENT ID EXISTS IN NOTE; IF NOT, LOG FAILURE AND RETURN
   if (!note["@patientid"]) {
     console.log("Patient id not found from advancedmd note");
@@ -194,7 +191,8 @@ const handlePatientData = async (note, token, template) => {
       template_name: template.template_name,
       failure_reason: "Failed to fetch demographic data: " + error.message,
       template_id: template.template_id,
-      note_id: note["@id"]
+      note_id: note["@id"],
+      advancedmd_patient_id: note["@patientid"],
     });
     return;
   }
@@ -287,6 +285,7 @@ const handlePatientData = async (note, token, template) => {
       failure_reason: failure_reason,
       template_id: template.template_id,
       note_id: note["@id"],
+      advancedmd_patient_id: note["@patientid"],
       patient_email: patientData?.email,
       patient_first_name: patientData?.first_name,
       patient_last_name: patientData?.last_name,
@@ -411,7 +410,11 @@ const handlePatientData = async (note, token, template) => {
       template_name: template.template_name,
       failure_reason: "Products are empty OR not available on advancedmd",
       template_id: template.template_id,
-      advancedmd_patient_id: note["@patientid"]
+      note_id: note["@id"],
+      advancedmd_patient_id: note["@patientid"],
+      patient_email: patientData?.email,
+      patient_first_name: patientData?.first_name,
+      patient_last_name: patientData?.last_name,
     });
     return;
   }
@@ -429,6 +432,7 @@ const handlePatientData = async (note, token, template) => {
       template_name: template.template_name,
       failure_reason: "Physician id is not given by advancedmd response. We are using advancedmd 'GetEhrUpdatedNotes' api",
       template_id: template.template_id,
+      note_id: note["@id"],
       advancedmd_patient_id: note["@patientid"],
       patient_email: patientData?.email,
       patient_first_name: patientData?.first_name,
@@ -456,7 +460,6 @@ const handlePatientData = async (note, token, template) => {
     advancedmd_patient_id: note["@patientid"]
   };
   console.log("additional_data====", additional_data);
-
   console.log("orderPayload====", orderPayload);
 
   try {
@@ -472,6 +475,7 @@ const handlePatientData = async (note, token, template) => {
         patient_email: patientData?.email,
         patient_first_name: patientData?.first_name,
         patient_last_name: patientData?.last_name,
+        physician_id,
       });
     }
   } catch (error) {
@@ -569,3 +573,9 @@ const extractProductsForLifeFile = (fields) => {
 
   return products;
 };
+
+
+
+module.exports ={
+  processTemplate
+}

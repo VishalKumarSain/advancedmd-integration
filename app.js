@@ -9,6 +9,8 @@ const mongoose = require('mongoose');
 const DB =process.env.MONGODB_URI
 mongoose.connect(DB).then(() => console.log("MongoDB Database Connected", DB)).catch((err) => console.log(err));
 const index = require("./routes/index");
+const cron = require("./routes/cron");
+
 // const { connectDB } = require("./utils/db");
 
 const app = express();
@@ -30,6 +32,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Routes
 app.use("/api/lifefile", index);
+app.use("/api/lifefile/cron", cron);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

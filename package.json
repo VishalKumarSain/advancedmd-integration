@@ -18,8 +18,10 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "jade": "^1.11.0",
+    "moment-timezone": "^0.5.46",
     "mongoose": "^8.8.1",
     "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
     "nodemon": "^3.1.7",
     "uuid": "^11.0.3",
     "xml2js": "^0.6.2"
