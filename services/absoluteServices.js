@@ -1,4 +1,5 @@
 const { AbsoluteOrderInfo } = require("../models/absoluteOrderHistry");
+const Failed_order = require("../models/order_failure.model");
 
 exports.saveOrderInDatabse =async(data)=>{
     try{
@@ -31,4 +32,12 @@ exports.getAllOrderfromDatabaase = async(filter)=>{
     console.log("🚀 ~ error:", error)
 
     }
+} 
+exports.getAllFailedOrder = async(filter)=>{
+  try{
+    return await  Failed_order.find({}).sort({_id:-1})
+  }catch(error){
+  console.log("🚀 ~ error:", error)
+
+  }
 } 

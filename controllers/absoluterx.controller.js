@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { getAllOrderfromDatabaase } = require("../services/absoluteServices");
+const { getAllOrderfromDatabaase, getAllFailedOrder } = require("../services/absoluteServices");
 
 exports.createPatientAbsolute = async (req, res) => {
   try {
@@ -472,3 +472,20 @@ exports.getAllOrderList = async(req,res)=>{
      });
    }
 }
+exports.getAllFailedOrderList = async(req,res)=>{
+  try {
+    let response= await getAllFailedOrder(req.query)
+      return res.status(200).json({
+        status: true,
+        data: response,
+        message: "Successfully fetched failed order list",
+      });
+    } catch (error) {
+      console.log("error==", error);
+      return res.status(500).json({
+        status: false,
+        message: error.message,
+      });
+    }
+ }
+
