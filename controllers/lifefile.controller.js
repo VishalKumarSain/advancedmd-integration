@@ -1,3 +1,6 @@
+const { VENDOR_ID, LOCATION_ID, API_NETWORK_ID } = require("../config/config");
+
+
 const createHelendalOrder = async (body) => {
   try {
     const { message, order } = body;
@@ -56,7 +59,7 @@ const createHelendalOrder = async (body) => {
 
     // Clean the payload of any undefined properties
     const cleanPayload = JSON.parse(JSON.stringify(payload));
-
+  const auth = Buffer.from("sandboxapi11437-171:@ANESeTBJ5n#9eoxuPzN").toString("base64");
     // Send the request to Life File API
     const response = await axios.post(`${API_BASE_URL}/order`, cleanPayload, {
       headers: {
@@ -69,22 +72,15 @@ const createHelendalOrder = async (body) => {
     });
 
     // Return success response
-    return res.status(200).json({
-      success: true,
-      data: response.data,
-      message: "Order successfully created!"
-    });
+    console.log("response.data",response.data)
+    return response.data
   } catch (error) {
     // Handle error response with a clear error message
     console.error("Error creating order:", error.message);
-    return res.status(400).json({
-      success: false,
-      message: "Something went wrong!",
-      error: error.response?.data || error.message
-    });
+   return false
   }
 };
-exports.createOrder = async (req, res) => {
+const createOrder = async (req, res) => {
     try {
       const { message, order } = req.body;
       let payload = {};
@@ -172,7 +168,7 @@ exports.createOrder = async (req, res) => {
   };
   
   
-  exports.updateOrderStatus = async (req, res) => {
+  const updateOrderStatus = async (req, res) => {
     try {
       const orderId = 65144829; // Replace with the correct order ID as needed
       const status = "b1a55"; // Replace with the appropriate status code if necessary
@@ -219,7 +215,7 @@ exports.createOrder = async (req, res) => {
   
   
   
-  exports.updateOrderShipping = async (req, res) => {
+const updateOrderShipping = async (req, res) => {
     try {
       const { orderId } = req.params;
       const {
@@ -288,3 +284,9 @@ exports.createOrder = async (req, res) => {
       });
     }
   };
+  module.exports={
+    createOrder,
+    updateOrderShipping,
+    createHelendalOrder,
+    updateOrderStatus
+  }
