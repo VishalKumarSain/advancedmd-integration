@@ -76,7 +76,14 @@ const checkOrCreatePatientInAbsoluteRX = async (patientData, template) => {
 const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_data) => {
   try {
 
-    // const check_exists_order_note = await getOrderfromDatabaase()
+    const check_exists_order_note = await getOrderfromDatabaase({notes_id : additional_data.note_id})
+    if(check_exists_order_note){
+      return {
+        status: false,
+        data: null,
+        message: `Order already created on absoluterx with the given note id - ${additional_data.note_id}`,
+      };
+    }
     const create_order_url = `https://portal.absoluterx.com/api/clinics/orders?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
 
     const response = await axios.post(create_order_url, orderPayload, {
@@ -85,6 +92,8 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
       },
     });
 
+    console.log("response.data===",response.data);
+    
     if (!response?.data?.data) {
       return { status: false, data: null, message: "Order created failed" };
     }
@@ -113,11 +122,13 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
       message: "Order created successfull",
     };
   } catch (error) {
-    console.error("Error creating order:", error.response.data.errors);
+    // console.error("Error creating order:", error?.response?.data?.errors);
+    console.error("Error creating order:", error);
+
     return {
       status: false,
       data: null,
-      message: error.response.data.message || error.response.data.error,
+      message: error?.response?.data?.message || error?.response?.data?.error,
     };
   }
 };
