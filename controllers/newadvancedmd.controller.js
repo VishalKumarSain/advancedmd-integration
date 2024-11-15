@@ -14,7 +14,7 @@ const full_absolute_create_order_flow = async (req, res) => {
         const token = "990039632a3e5ca3ef41c3a402f5c5832b36bdc5ef64e2fc8c9b5104e9732aa2d9554e";
 
         // FETCH TEMPLATES FROM DATABASE WHERE TEMPLATE ID IS IN THE SPECIFIED ARRAY
-        const templates = await EHR_TEMPLATE.find({ template_id: { $in: [100044027] } });
+        const templates = await EHR_TEMPLATE.find({ template_id: { $in: [100044028] } });
         console.log("templates====", templates);
     
         // CHECK IF ANY TEMPLATES WERE FOUND
@@ -22,7 +22,7 @@ const full_absolute_create_order_flow = async (req, res) => {
           // PROCESS EACH TEMPLATE IN THE LIST
           for (const template of templates) {
             // CHECK IF TEMPLATE ID MATCHES ABSOLUTERX TEMPLATE ID (100044027)
-            if (template?.template_id == 100044027) {
+            if (template?.template_id == 100044028) {
               console.log("template====", template);
     
               // CALL FUNCTION TO PROCESS TEMPLATE DATA
@@ -292,8 +292,12 @@ const handlePatientData = async (note, token, template) => {
     });
     return;
   }
-   
+     // FILTER DATA TO OBTAIN PHYSICIAN ID AND SHIPPING DETAILS
+  const filteredData = note.pagelist.page.fieldlist.field.filter(
+    item => item['@name'] && !item['@name'].startsWith('Unititled')
+  );
   if(template.template_name.includes("Hallandale")){
+    console.log("Hallandale==================================entry")
      let orderSet={
       message:{
       },
@@ -301,27 +305,40 @@ const handlePatientData = async (note, token, template) => {
 
       }
      }
+     const physician_id = filteredData.find(item => item['@name'] === 'provider_id_hd')?.['@value'] || '';
     const ship_to_clinic = filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1";
-    const npi = filteredData.find(item => item['@name'] === 'npi')?.['@value'] || '';
-    if(!npi){
-      await Failed_order.create({
-        template_name: template.template_name,
-        failure_reason: "NPI is not given in advancedmd response. We are using advancedmd GetEhrUpdatedNotes",
-        template_id: template.template_id,
-        note_id: note["@id"],
-        advancedmd_patient_id: note["@patientid"],
-        patient_email: patientData?.email,
-        patient_first_name: patientData?.first_name,
-        patient_last_name: patientData?.last_name,
-      });
-    }
+    const npi = filteredData.find(item => item['@name'] === 'provider_npi_hd')?.['@value'] || '';
+    const provider_name = filteredData.find(item => item['@name'] === 'provider_hd')?.['@value'] || '';
+    console.log("🚀 ~ handlePatientData ~ provider_name:", provider_name)
+    const nameParts = provider_name.split(" ");
+    const lastName = nameParts[1] || "";
+    const firstAndMiddleNames = (nameParts[0] || "").trim().split(" ");
+    const firstName = firstAndMiddleNames[0] || "";
+    const middleName = firstAndMiddleNames.slice(1).join(" ") || "";
+      console.log("firstName",firstName)
+      console.log("lastName",lastName)
+      console.log("npi",npi)
+      console.log("physician_id",physician_id)
+      
+    // if(!npi){
+    //   await Failed_order.create({
+    //     template_name: template.template_name,
+    //     failure_reason: "NPI is not given in advancedmd response. We are using advancedmd GetEhrUpdatedNotes",
+    //     template_id: template.template_id,
+    //     note_id: note["@id"],
+    //     advancedmd_patient_id: note["@patientid"],
+    //     patient_email: patientData?.email,
+    //     patient_first_name: patientData?.first_name,
+    //     patient_last_name: patientData?.last_name,
+    //   });
+    // }
 
     orderSet.message =  {
       id: uuidv4()   //REQUIRED
       // "sentTime": "2024-10-24T12:30:00Z" //OPTIONAL
     }
     orderSet.order.practice = {
-      id: 993314  //REQUIRED 
+      id: physician_id || "993314"  //REQUIRED 
     }
     orderSet.order.patient  = {
       lastName: patientData.last_name,  //REQUIRED
@@ -357,8 +374,8 @@ const handlePatientData = async (note, token, template) => {
       //   "licenseState": "CA",  //OPTIONAL
       //   "licenseNumber": "LIC1234567890",  //OPTIONAL
       //   "dea": "AB1234567",  //OPTIONAL
-      "lastName": "vishal", //REQUIRED
-      "firstName": "kumar"  //REQUIRED
+      "lastName":firstName, //REQUIRED
+      "firstName": lastName  //REQUIRED
       //   "middleName": "A",  //OPTIONAL
       //   "address1": "123 Main St",  //OPTIONAL
       //   "address2": "Suite 4B", //OPTIONAL
@@ -369,8 +386,25 @@ const handlePatientData = async (note, token, template) => {
       //   "fax": "(123) 456-7891", //OPTIONAL
       //   "email": "mailto:john.smith@example.com" //OPTIONAL
     }
-  
-    orderSet.order.rxs = extractProductsForLifeFile(note.pagelist.page.fieldlist.field)
+   let productsArry= extractProductsForLifeFile(note.pagelist.page.fieldlist.field)
+   if(!productsArry.length){
+    await Failed_order.create({
+      template_name: template.template_name,
+      failure_reason: "Products are empty OR not available on advancedmd",
+      template_id: template.template_id,
+      note_id: note["@id"],
+      advancedmd_patient_id: note["@patientid"],
+      patient_email: patientData?.email,
+      patient_first_name: patientData?.first_name,
+      patient_last_name: patientData?.last_name,
+    });
+    return;
+   }
+    orderSet.order.rxs = productsArry
+    console.log("orderSet",orderSet.order)
+   
+    return
+      // IF NO PRODUCTS ARE AVAILABLE, SAVE FAILURE AND RETURN
     // [
     //   {
     //     drugName: filteredData.find(item => item['@name'] === 'Unitialed1')?.['@value'] || "TIRZEPATIDE 20MG/ml (3ML) INJECTION", // REQUIRED
@@ -419,10 +453,7 @@ const handlePatientData = async (note, token, template) => {
     return;
   }
 
-  // FILTER DATA TO OBTAIN PHYSICIAN ID AND SHIPPING DETAILS
-  const filteredData = note.pagelist.page.fieldlist.field.filter(
-    item => item['@name'] && !item['@name'].startsWith('Unititled')
-  );
+
   const physician_id = filteredData.find(item => item['@name'] === 'provider_id')?.['@value'] || '';
   const ship_to_clinic = filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1";
 
@@ -549,29 +580,44 @@ const extractProductsForLifeFile = (fields) => {
     .forEach(field => {
       const name = field["@name"];
       const value = field["@value"];
-      const index = name.match(/_(\d+)$/)?.[1]; // EXTRACT INDEX FROM FIELD NAME
+      const index = name.match(/_(\d+)/)?.[1];//name.match(/_(\d+)$/)?.[1]; // EXTRACT INDEX FROM FIELD NAME
+//console.log("fields",fields)
 
       // IF AN INDEX EXISTS, ORGANIZE PRODUCT DATA INTO GROUPS
-      if (index) {
+      if (index ) {
+        // if(index==4){
+        //   console.log("productGroups[index]",productGroups[index])
+        // }
+        console.log("field========================>",field,"index",index)
         if (!productGroups[index]) productGroups[index] = {};
-        if (name.includes("npi")) productGroups[index].npi = value;
-        if (name.includes("sku_no")) productGroups[index].sku = value;
-        if (name.includes("quantity_no")) productGroups[index].quantity = value;
-        if (name.includes("refill_no")) productGroups[index].refills = value || "0";
-        if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
+        if (name.includes("product_hd")&&value) productGroups[index].drugName = value;
+        if (name.includes("strength_hd")&&value) productGroups[index].drugStrength = value;
+        if (name.includes("product_qty")&&value) productGroups[index].quantity = value;
+        if (name.includes("product_refill")&&value) productGroups[index].refills = value;
+
+        // if (name.includes("quantity_no")) productGroups[index].quantity = value;
+        // if (name.includes("refill_no")) productGroups[index].refills = value || "0";
+        // if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
       }
     });
 
   // LOOP THROUGH EACH PRODUCT GROUP, ADDING MISSING DEFAULTS WHERE NECESSARY
+  //console.log("productGroups",productGroups)
   for (const index in productGroups) {
     products.push({
       ...productGroups[index],
-      days_supply: "30",
-      sig: productGroups[index].sig || "Use as directed" // SET DEFAULT SIG IF MISSING
+     // days_supply: "30",
+      //sig: productGroups[index].sig || "Use as directed" // SET DEFAULT SIG IF MISSING
     });
   }
+   // FILTER OUT EMPTY OBJECTS
+   const filteredProducts = products.filter(
+    product => Object.keys(product).length > 0 && product.drugName && product.drugStrength
+  );
 
-  return products;
+  console.log("Filtered products:", filteredProducts);
+ //console.log("products==========================",products)
+  return filteredProducts;
 };
 
 

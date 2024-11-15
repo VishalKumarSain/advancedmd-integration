@@ -1,3 +1,89 @@
+const createHelendalOrder = async (body) => {
+  try {
+    const { message, order } = body;
+    let payload = {};
+
+    // Construct payload conditionally as before
+    if (message.id || message.sentTime) {
+      payload.message = {
+        ...(message.id && { id: message.id }),
+        ...(message.sentTime && { sentTime: message.sentTime })
+      };
+    }
+
+    if (order) {
+      payload.order = {};
+
+      if (order.general) {
+        payload.order.general = {
+          ...(order.general.memo && { memo: order.general.memo }),
+          ...(order.general.referenceId && { referenceId: order.general.referenceId }),
+          ...(order.general.statusId && { statusId: order.general.statusId })
+        };
+      }
+
+      if (order.document?.pdfBase64) {
+        payload.order.document = { pdfBase64: order.document.pdfBase64 };
+      }
+
+      if (order.prescriber) {
+        payload.order.prescriber = {
+          ...(order.prescriber.npi && { npi: order.prescriber.npi }),
+          ...(order.prescriber.lastName && { lastName: order.prescriber.lastName }),
+          ...(order.prescriber.firstName && { firstName: order.prescriber.firstName })
+        };
+      }
+
+      if (order.practice?.id) {
+        payload.order.practice = { id: order.practice.id };
+      }
+
+      if (order.patient) {
+        payload.order.patient = {
+          ...(order.patient.lastName && { lastName: order.patient.lastName }),
+          ...(order.patient.firstName && { firstName: order.patient.firstName }),
+          ...(order.patient.gender && { gender: order.patient.gender }),
+          ...(order.patient.dateOfBirth && { dateOfBirth: order.patient.dateOfBirth })
+        };
+      }
+
+      if (order.rxs) {
+        payload.order.rxs = order.rxs.map(rx => ({
+          ...(rx.drugName && { drugName: rx.drugName })
+        }));
+      }
+    }
+
+    // Clean the payload of any undefined properties
+    const cleanPayload = JSON.parse(JSON.stringify(payload));
+
+    // Send the request to Life File API
+    const response = await axios.post(`${API_BASE_URL}/order`, cleanPayload, {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+        "X-Vendor-ID": VENDOR_ID,
+        "X-Location-ID": LOCATION_ID,
+        "X-API-Network-ID": API_NETWORK_ID
+      }
+    });
+
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      data: response.data,
+      message: "Order successfully created!"
+    });
+  } catch (error) {
+    // Handle error response with a clear error message
+    console.error("Error creating order:", error.message);
+    return res.status(400).json({
+      success: false,
+      message: "Something went wrong!",
+      error: error.response?.data || error.message
+    });
+  }
+};
 exports.createOrder = async (req, res) => {
     try {
       const { message, order } = req.body;
