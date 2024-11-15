@@ -6,7 +6,7 @@ const { checkOrCreatePatientInAbsoluteRX, createOrderAbsoluteRXHelper } = requir
 const EHR_TEMPLATE = require("../models/ehrtemplates.model");
 const Failed_order = require("../models/order_failure.model");
 
-exports.full_absolute_create_order_flow = async (req, res) => {
+const full_absolute_create_order_flow = async (req, res) => {
   try {
     // Retrieve token for AdvancedMD API
     // const token = await get_advanced_md_token();
@@ -577,5 +577,6 @@ const extractProductsForLifeFile = (fields) => {
 
 
 module.exports ={
+  full_absolute_create_order_flow,
   processTemplate
 }

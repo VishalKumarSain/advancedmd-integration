@@ -21,7 +21,7 @@ router.get("/ehrtemplates", getEhrTemplates);
 router.get("/patient-search", patientSearch);
 
 
-router.get("/advancedmd-flow", full_absolute_create_order_flow);
+ router.get("/advancedmd-flow", full_absolute_create_order_flow);
 router.get("/helendal-flow", full_helendal_create_order_flow);
 // -PATIENT RESPONSE
 
