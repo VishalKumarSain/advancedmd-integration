@@ -24,7 +24,7 @@ const absolute_schema = new Schema(
     },
     patient_id: {
       type: Number,
-      required: true,
+      required: false,
     },
     physician_id: {
       type: Number,

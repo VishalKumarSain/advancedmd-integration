@@ -1,67 +1,16 @@
-const { VENDOR_ID, LOCATION_ID, API_NETWORK_ID } = require("../config/config");
+const axios = require("axios");
+
+const { VENDOR_ID, LOCATION_ID, API_NETWORK_ID ,API_USERNAME, API_PASSWORD, API_BASE_URL} = require("../config/config");
+const { saveOrderInDatabse } = require("../services/absoluteServices");
 
 
-const createHelendalOrder = async (body) => {
+const createHelendalOrder = async (body, patientData, template, additional_data) => {
   try {
     const { message, order } = body;
     let payload = {};
-
-    // Construct payload conditionally as before
-    if (message.id || message.sentTime) {
-      payload.message = {
-        ...(message.id && { id: message.id }),
-        ...(message.sentTime && { sentTime: message.sentTime })
-      };
-    }
-
-    if (order) {
-      payload.order = {};
-
-      if (order.general) {
-        payload.order.general = {
-          ...(order.general.memo && { memo: order.general.memo }),
-          ...(order.general.referenceId && { referenceId: order.general.referenceId }),
-          ...(order.general.statusId && { statusId: order.general.statusId })
-        };
-      }
-
-      if (order.document?.pdfBase64) {
-        payload.order.document = { pdfBase64: order.document.pdfBase64 };
-      }
-
-      if (order.prescriber) {
-        payload.order.prescriber = {
-          ...(order.prescriber.npi && { npi: order.prescriber.npi }),
-          ...(order.prescriber.lastName && { lastName: order.prescriber.lastName }),
-          ...(order.prescriber.firstName && { firstName: order.prescriber.firstName })
-        };
-      }
-
-      if (order.practice?.id) {
-        payload.order.practice = { id: order.practice.id };
-      }
-
-      if (order.patient) {
-        payload.order.patient = {
-          ...(order.patient.lastName && { lastName: order.patient.lastName }),
-          ...(order.patient.firstName && { firstName: order.patient.firstName }),
-          ...(order.patient.gender && { gender: order.patient.gender }),
-          ...(order.patient.dateOfBirth && { dateOfBirth: order.patient.dateOfBirth })
-        };
-      }
-
-      if (order.rxs) {
-        payload.order.rxs = order.rxs.map(rx => ({
-          ...(rx.drugName && { drugName: rx.drugName })
-        }));
-      }
-    }
-
-    // Clean the payload of any undefined properties
-    const cleanPayload = JSON.parse(JSON.stringify(payload));
-  const auth = Buffer.from("sandboxapi11437-171:@ANESeTBJ5n#9eoxuPzN").toString("base64");
+    const auth = Buffer.from(`${API_USERNAME}:${API_PASSWORD}`).toString("base64");
     // Send the request to Life File API
-    const response = await axios.post(`${API_BASE_URL}/order`, cleanPayload, {
+    const response = await axios.post(`${API_BASE_URL}/order`, body, {
       headers: {
         Authorization: `Basic ${auth}`,
         "Content-Type": "application/json",
@@ -73,11 +22,40 @@ const createHelendalOrder = async (body) => {
 
     // Return success response
     console.log("response.data",response.data)
-    return response.data
+
+
+    if(response.data.type =="success"){
+      
+    const local_db_data = {
+      template_name : template.template_name,
+      frist_name: patientData.first_name,
+      last_name: patientData.last_name,
+      email: patientData.email,
+      order_id: response?.data?.data.orderId,
+      // patient_id: orderPayload.patient_id,
+      physician_id: body?.order?.practice?.id,
+      template_id: additional_data.template_id,
+      notes_id: additional_data.note_id,
+      advancemd_patient_id: additional_data.advancedmd_patient_id,
+      // order_status: data_res.status,
+    }
+
+    console.log("local_db_data====",local_db_data);
+    
+    const save_new_order = await saveOrderInDatabse(local_db_data);
+      return {status: true,  data : response.data, message :"Order created"}
+
+    }else{
+      return {status: false,  data : response.data, message :"Order creation failed"}
+    }
+
   } catch (error) {
     // Handle error response with a clear error message
-    console.error("Error creating order:", error.message);
-   return false
+    // if( error.response.data.type=="error"){
+    //   error.message = error.response.data.data.message
+    // }
+    console.error("Error creating order:", error);
+   return {status : false, data:null,  message: error.message}
   }
 };
 const createOrder = async (req, res) => {

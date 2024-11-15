@@ -5,6 +5,7 @@ const { get_advanced_md_token } = require("../helpers/access_token");
 const { checkOrCreatePatientInAbsoluteRX, createOrderAbsoluteRXHelper } = require("./absoluterxorder.controller");
 const EHR_TEMPLATE = require("../models/ehrtemplates.model");
 const Failed_order = require("../models/order_failure.model");
+const { createHelendalOrder } = require("./lifefile.controller");
 
 const full_absolute_create_order_flow = async (req, res) => {
   try {
@@ -14,7 +15,7 @@ const full_absolute_create_order_flow = async (req, res) => {
         const token = "990039632a3e5ca3ef41c3a402f5c5832b36bdc5ef64e2fc8c9b5104e9732aa2d9554e";
 
         // FETCH TEMPLATES FROM DATABASE WHERE TEMPLATE ID IS IN THE SPECIFIED ARRAY
-        const templates = await EHR_TEMPLATE.find({ template_id: { $in: [100044028] } });
+        const templates = await EHR_TEMPLATE.find({ template_id: { $in: [100044028, 100044027] } });
         console.log("templates====", templates);
     
         // CHECK IF ANY TEMPLATES WERE FOUND
@@ -22,7 +23,7 @@ const full_absolute_create_order_flow = async (req, res) => {
           // PROCESS EACH TEMPLATE IN THE LIST
           for (const template of templates) {
             // CHECK IF TEMPLATE ID MATCHES ABSOLUTERX TEMPLATE ID (100044027)
-            if (template?.template_id == 100044028) {
+            if (template?.template_id == 100044028 || template?.template_id == 100044027) {
               console.log("template====", template);
     
               // CALL FUNCTION TO PROCESS TEMPLATE DATA
@@ -296,6 +297,14 @@ const handlePatientData = async (note, token, template) => {
   const filteredData = note.pagelist.page.fieldlist.field.filter(
     item => item['@name'] && !item['@name'].startsWith('Unititled')
   );
+
+    // ADDITIONAL DATA FOR LOGGING OR TRACKING PURPOSES
+    const additional_data = {
+      template_id: template.template_id,
+      note_id: note["@id"],
+      advancedmd_patient_id: note["@patientid"]
+    };
+
   if(template.template_name.includes("Hallandale")){
     console.log("Hallandale==================================entry")
      let orderSet={
@@ -319,6 +328,12 @@ const handlePatientData = async (note, token, template) => {
       console.log("lastName",lastName)
       console.log("npi",npi)
       console.log("physician_id",physician_id)
+
+      const dateOfBirth = patientData.dob;
+      // SPLIT THE DATE INTO COMPONENTS
+      const [month, day, year] = dateOfBirth.split('/');
+      // FORMAT TO YYYY-MM-DD
+      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       
     // if(!npi){
     //   await Failed_order.create({
@@ -344,19 +359,19 @@ const handlePatientData = async (note, token, template) => {
       lastName: patientData.last_name,  //REQUIRED
       firstName:patientData.first_name,  //REQUIRED
       middleName: patientData.middle_name, //OPTIONAL
-      gender: patientData.gender === "Male" ? "M" : patientData.gender === "Female" ? "F" : "",
-      dateOfBirth: patientData.dob , //REQUIRED
+      gender: patientData.gender === "Male" ? "m" : patientData.gender === "Female" ? "f" : "",
+      dateOfBirth: formattedDate , //REQUIRED
       address1: patientData.address.street,  //OPTIONAL
       address2: patientData.address.street2,  //OPTIONAL
       city:patientData.address.city, //OPTIONAL
       state: patientData.address.state, //OPTIONAL
       zip: patientData.address.zip, //OPTIONAL
-      country:  patientData.address.country, //OPTIONAL
+      country:  "US", //OPTIONAL
       phoneHome: patientData.phone_number, //OPTIONAL
       email: patientData.email //OPTIONAL
     }
     orderSet.order.shipping = {
-      recipientType: ship_to_clinic, //OPTIONAL
+      recipientType: "patient", //OPTIONAL
       recipientLastName: patientData.last_name, //OPTIONAL
       recipientFirstName: patientData.first_name, //OPTIONAL
       recipientPhone: patientData.phone_number, //OPTIONAL
@@ -365,7 +380,7 @@ const handlePatientData = async (note, token, template) => {
       city: patientData.address.city, //OPTIONAL
       state: patientData.address.state, //OPTIONAL
       zipCode: patientData.address.zip, //OPTIONAL
-      country: patientData.address.country //OPTIONAL
+      country: "US" //OPTIONAL
       //   "service": 2 //OPTIONAL
     }
 
@@ -403,129 +418,129 @@ const handlePatientData = async (note, token, template) => {
     orderSet.order.rxs = productsArry
     console.log("orderSet",orderSet.order)
    
-    return
-      // IF NO PRODUCTS ARE AVAILABLE, SAVE FAILURE AND RETURN
-    // [
-    //   {
-    //     drugName: filteredData.find(item => item['@name'] === 'Unitialed1')?.['@value'] || "TIRZEPATIDE 20MG/ml (3ML) INJECTION", // REQUIRED
-    //     drugStrength: filteredData.find(item => item['@name'] === 'drug_strength_1')?.['@value'] || "1ml (2.5mg/ml)", // Optional
-    //     quantity: filteredData.find(item => item['@name'] === 'drug_quantity_1')?.['@value'] || "1"
-    //   },
-    //   {
-    //     drugName: filteredData.find(item => item['@name'] === 'drug_name_2')?.['@value'] || "SEMAGLUTIDE 10MG/4ML INJECTION", // REQUIRED
-    //     drugStrength: filteredData.find(item => item['@name'] === 'drug_strength_2')?.['@value'] || "1ml (2.5mg/ml)", // Optional
-    //     quantity: filteredData.find(item => item['@name'] === 'drug_quantity_2')?.['@value'] || "1"
-    //   }
-    // ]
-  }
-  // CHECK OR CREATE PATIENT IN ABSOLUTERX AND LOG IF FAILURE OCCURS
-  const absoluteRxData = await checkOrCreatePatientInAbsoluteRX(patientData, template);
-  if (!absoluteRxData.status) {
-    await Failed_order.create({
-      template_name: template.template_name,
-      failure_reason: absoluteRxData.message,
-      template_id: template.template_id,
-      note_id: note["@id"],
-      advancedmd_patient_id: note["@patientid"],
-      patient_email: patientData?.email,
-      patient_first_name: patientData?.first_name,
-      patient_last_name: patientData?.last_name,
-    });
-    return;
-  }
-
-  // EXTRACT PRODUCT DETAILS FROM NOTE
-  const products = extractProducts(note.pagelist.page.fieldlist.field);
-  console.log("products===", products);
-
-  // IF NO PRODUCTS ARE AVAILABLE, SAVE FAILURE AND RETURN
-  if (!products.length) {
-    await Failed_order.create({
-      template_name: template.template_name,
-      failure_reason: "Products are empty OR not available on advancedmd",
-      template_id: template.template_id,
-      note_id: note["@id"],
-      advancedmd_patient_id: note["@patientid"],
-      patient_email: patientData?.email,
-      patient_first_name: patientData?.first_name,
-      patient_last_name: patientData?.last_name,
-    });
-    return;
-  }
-
-
-  const physician_id = filteredData.find(item => item['@name'] === 'provider_id')?.['@value'] || '';
-  const ship_to_clinic = filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1";
-
-  // IF PHYSICIAN ID IS MISSING, SAVE FAILURE AND RETURN
-  if (!physician_id || physician_id == "") {
-    await Failed_order.create({
-      template_name: template.template_name,
-      failure_reason: "Physician id is not given by advancedmd response. We are using advancedmd 'GetEhrUpdatedNotes' api",
-      template_id: template.template_id,
-      note_id: note["@id"],
-      advancedmd_patient_id: note["@patientid"],
-      patient_email: patientData?.email,
-      patient_first_name: patientData?.first_name,
-      patient_last_name: patientData?.last_name,
-    });
-    return;
-  }
-
-  // PREPARE ORDER PAYLOAD FOR ABSOLUTERX
-  const orderPayload = {
-    patient_id: absoluteRxData.data.id,
-    physician_id,
-    ship_to_clinic: ship_to_clinic,
-    service_type: "two_day",
-    signature_required: "1",
-    memo: "Test memo",
-    external_id: uuidv4(),
-    products: products,
-  };
-
-  // ADDITIONAL DATA FOR LOGGING OR TRACKING PURPOSES
-  const additional_data = {
-    template_id: template.template_id,
-    note_id: note["@id"],
-    advancedmd_patient_id: note["@patientid"]
-  };
-  console.log("additional_data====", additional_data);
-  console.log("orderPayload====", orderPayload);
-
-  try {
-    // SEND ORDER PAYLOAD TO ABSOLUTERX
-    const orderResponse = await createOrderAbsoluteRXHelper(orderPayload, template, additional_data);
-    console.log("Order response:", orderResponse);
-    if(!orderResponse.status){
+    // return
+    const hallandle_response  = await createHelendalOrder(orderSet, patientData, template, additional_data)
+    if(!hallandle_response.status){
       await Failed_order.create({
         template_name: template.template_name,
-        failure_reason: orderResponse.message,
+        failure_reason: "Error creating order: " + hallandle_response.message,
         template_id: template.template_id,
         note_id: note["@id"],
         advancedmd_patient_id: note["@patientid"],
         patient_email: patientData?.email,
         patient_first_name: patientData?.first_name,
         patient_last_name: patientData?.last_name,
-        physician_id,
       });
     }
-  } catch (error) {
-    console.error("Failed to create order in AbsoluteRX", error.message);
-    await Failed_order.create({
-      template_name: template.template_name,
-      failure_reason: "Error creating order: " + error.message,
-      template_id: template.template_id,
-      note_id: note["@id"],
-      advancedmd_patient_id: note["@patientid"],
-      patient_email: patientData?.email,
-      patient_first_name: patientData?.first_name,
-      patient_last_name: patientData?.last_name,
-    });
+  }
+
+
+  if(template.template_name.includes("Absolute")){
+
+    // CHECK OR CREATE PATIENT IN ABSOLUTERX AND LOG IF FAILURE OCCURS
+    const absoluteRxData = await checkOrCreatePatientInAbsoluteRX(patientData, template);
+    if (!absoluteRxData.status) {
+      await Failed_order.create({
+        template_name: template.template_name,
+        failure_reason: absoluteRxData.message,
+        template_id: template.template_id,
+        note_id: note["@id"],
+        advancedmd_patient_id: note["@patientid"],
+        patient_email: patientData?.email,
+        patient_first_name: patientData?.first_name,
+        patient_last_name: patientData?.last_name,
+      });
+      return;
+    }
+    
+    // EXTRACT PRODUCT DETAILS FROM NOTE
+    const products = extractProducts(note.pagelist.page.fieldlist.field);
+    console.log("products===", products);
+    
+    // IF NO PRODUCTS ARE AVAILABLE, SAVE FAILURE AND RETURN
+    if (!products.length) {
+      await Failed_order.create({
+        template_name: template.template_name,
+        failure_reason: "Products are empty OR not available on advancedmd",
+        template_id: template.template_id,
+        note_id: note["@id"],
+        advancedmd_patient_id: note["@patientid"],
+        patient_email: patientData?.email,
+        patient_first_name: patientData?.first_name,
+        patient_last_name: patientData?.last_name,
+      });
+      return;
+    }
+    
+    
+    const physician_id = filteredData.find(item => item['@name'] === 'provider_id')?.['@value'] || '';
+    const ship_to_clinic = filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1";
+    
+    // IF PHYSICIAN ID IS MISSING, SAVE FAILURE AND RETURN
+    if (!physician_id || physician_id == "") {
+      await Failed_order.create({
+        template_name: template.template_name,
+        failure_reason: "Physician id is not given by advancedmd response. We are using advancedmd 'GetEhrUpdatedNotes' api",
+        template_id: template.template_id,
+        note_id: note["@id"],
+        advancedmd_patient_id: note["@patientid"],
+        patient_email: patientData?.email,
+        patient_first_name: patientData?.first_name,
+        patient_last_name: patientData?.last_name,
+      });
+      return;
+    }
+    
+    // PREPARE ORDER PAYLOAD FOR ABSOLUTERX
+    const orderPayload = {
+      patient_id: absoluteRxData.data.id,
+      physician_id,
+      ship_to_clinic: ship_to_clinic,
+      service_type: "two_day",
+      signature_required: "1",
+      memo: "Test memo",
+      external_id: uuidv4(),
+      products: products,
+    };
+    
+    
+    console.log("additional_data====", additional_data);
+    console.log("orderPayload====", orderPayload);
+    
+    try {
+      // SEND ORDER PAYLOAD TO ABSOLUTERX
+      const orderResponse = await createOrderAbsoluteRXHelper(orderPayload, template, additional_data);
+      console.log("Order response:", orderResponse);
+      if(!orderResponse.status){
+        await Failed_order.create({
+          template_name: template.template_name,
+          failure_reason: orderResponse.message,
+          template_id: template.template_id,
+          note_id: note["@id"],
+          advancedmd_patient_id: note["@patientid"],
+          patient_email: patientData?.email,
+          patient_first_name: patientData?.first_name,
+          patient_last_name: patientData?.last_name,
+          physician_id,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to create order in AbsoluteRX", error.message);
+      await Failed_order.create({
+        template_name: template.template_name,
+        failure_reason: "Error creating order: " + error.message,
+        template_id: template.template_id,
+        note_id: note["@id"],
+        advancedmd_patient_id: note["@patientid"],
+        patient_email: patientData?.email,
+        patient_first_name: patientData?.first_name,
+        patient_last_name: patientData?.last_name,
+      });
+    }
   }
 
 } catch (error) {
-  console.error("Unexpected error in handlePatientData", error.message);
+  console.error("Unexpected error in handlePatientData", error);
   await Failed_order.create({
     template_name: template.template_name,
     failure_reason: "Unexpected error: " + error.message,
