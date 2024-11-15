@@ -124,8 +124,20 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
     };
   } catch (error) {
     // console.error("Error creating order:", error?.response?.data?.errors);
-    console.error("Error creating order:", error);
+    // console.error("Error creating order:", error.response.data);
 
+    if (error.response?.data?.errors) {
+      const errors = error.response.data.errors;
+    
+      // MERGE ALL ERRORS INTO A SINGLE STRING
+      const mergedErrors = Object.values(errors)
+        .flat() // FLATTENS ARRAYS OF MESSAGES INTO A SINGLE ARRAY
+        .join(', '); // COMBINES ALL MESSAGES INTO A SINGLE STRING
+    
+      console.log("mergedErrors",mergedErrors);
+      error.response.data.message = mergedErrors
+    }
+    
     return {
       status: false,
       data: null,
