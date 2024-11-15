@@ -106,8 +106,8 @@ const processTemplate = async (template, token) => {
     if(notes && notes?.length){
       for (const note of notes) {
         if (note["@signedbyuser"] && note["@signedbyuser"] !=="") {
-          console.log("note====",note);
-          console.log("note.pagelist.page.fieldlist.field.length====",note.pagelist.page.fieldlist.field.length);
+         // console.log("note====",note);
+         // console.log("note.pagelist.page.fieldlist.field.length====",note.pagelist.page.fieldlist.field.length);
           await handlePatientData(note, token, template);
         }
       }
@@ -143,7 +143,7 @@ const handlePatientData = async (note, token, template) => {
   };
 
   const demographicResponse = await axios.request(demographicConfig);
-  console.log("🚀 ~ handlePatientData ~ demographicResponse:", demographicResponse.data?.PPMDResults?.Results.patientlist?.patient)
+ // console.log("🚀 ~ handlePatientData ~ demographicResponse:", demographicResponse.data?.PPMDResults?.Results.patientlist?.patient)
 
   //IF PATIENT NOT FOUND ON ADVANCEDMD THEN WE SAVE THE ERROR AND RETURN THE PROCESS
   if(!demographicResponse?.data?.PPMDResults?.Results?.patientlist?.patient){
@@ -181,8 +181,8 @@ const handlePatientData = async (note, token, template) => {
     },
   };
 
-  console.log("patientData===",patientData);
-  return 
+  //console.log("patientData===",patientData);
+
   let failure_reason = "";
   if(!patientData.name){
     failure_reason += "Patient name is not given in advancedmd response. We are using advancedmd 'getdemographic'. "
@@ -228,139 +228,123 @@ const handlePatientData = async (note, token, template) => {
     failure_reason += "Patient address country is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
   }
   
-  if(failure_reason !== ""){
-    const save_failed_order = await Failed_order.create(
-      {
-        template_name: template.template_name,
-        failure_reason: failure_reason,
-        template_id: template.template_id,
+  //uncomment karna hai -deepak
+//   if(failure_reason !== ""){
+//     const save_failed_order = await Failed_order.create(
+//       {
+//         template_name: template.template_name,
+//         failure_reason: failure_reason,
+//         template_id: template.template_id,
+//       }
+//     )
+//     return
+//   }
+
+//   const absoluteRxData = await checkOrCreatePatientInAbsoluteRX(patientData, template);
+//   // console.log("absoluteRxData====",absoluteRxData);
+  
+//   if(!absoluteRxData.status){
+//         // Optionally log or store the failed order in a database for further review
+//         await Failed_order.create({
+//           template_name: template.template_name,
+//           failure_reason: absoluteRxData.message,
+//           template_id: template.template_id,
+//         });
+//     return
+//   }
+      //console.log("note.pagelist",note.pagelist)
+     
+      await processPageData(note)
+  //console.log("products===",products);
+
+//   if(!products.length){
+//     // Optionally log or store the failed order in a database for further review
+//     await Failed_order.create({
+//       template_name: template.template_name,
+//       failure_reason: "Products are empty OR not available on advancedmd",
+//       template_id: template.template_id,
+//       advancedmd_patient_id: note["@patientid"]
+//     });
+//     return
+// }
+
+};
+
+  const processPageData = (data) => {
+    const pagelist = data.pagelist;
+     console.log("pagelist",pagelist)
+    if (pagelist && pagelist.page) {
+      const fieldlist = pagelist.page.fieldlist;
+      if (fieldlist && Array.isArray(fieldlist)) {
+        processFields(fieldlist);
+      } else if (fieldlist && typeof fieldlist === 'object') {
+        processFields([fieldlist]); 
       }
-    )
-    return
-  }
-
-  const absoluteRxData = await checkOrCreatePatientInAbsoluteRX(patientData, template);
-  // console.log("absoluteRxData====",absoluteRxData);
-  
-  if(!absoluteRxData.status){
-        // Optionally log or store the failed order in a database for further review
-        await Failed_order.create({
-          template_name: template.template_name,
-          failure_reason: absoluteRxData.message,
-          template_id: template.template_id,
-        });
-    return
-  }
-  const products = extractProducts(note.pagelist.page.fieldlist.field);
-  console.log("products===",products);
-  
-  if(!products.length){
-    // Optionally log or store the failed order in a database for further review
-    await Failed_order.create({
-      template_name: template.template_name,
-      failure_reason: "Products are empty OR not available on advancedmd",
-      template_id: template.template_id,
-      advancedmd_patient_id: note["@patientid"]
-    });
-    return
-}
-
-  const filteredData = note.pagelist.page.fieldlist.field.filter(
-    item => item['@name'] && !item['@name'].startsWith('Unititled')
-  );
-  // console.log("filteredData====",filteredData);
-  const physician_id =  filteredData.find(item => item['@name'] === 'provider_id')?.['@value'] || ''
-  const ship_to_clinic=  filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1"
-
-
-  if(!physician_id || physician_id==""){
-    await Failed_order.create({
-      template_name: template.template_name,
-      failure_reason: "Physician id is not given by advancedmd response. We are using advancedmd 'GetEhrUpdatedNotes' api",
-      template_id: template.template_id,
-      advancedmd_patient_id: note["@patientid"]
-    });
-    return
-  }
-  const orderPayload = {
-    patient_id: absoluteRxData.data.id,
-    physician_id,
-    ship_to_clinic: ship_to_clinic,
-    service_type: "two_day",
-    signature_required: "1",
-    memo: "Test memo",
-    external_id: uuidv4(),
-    products: products,
-    
-  };
-
-
-  const additional_data = {
-    template_id : template.template_id,
-    note_id : note["@id"],
-    advancedmd_patient_id: note["@patientid"]
-  }
-  console.log("additional_data====",additional_data);
-
-  console.log("orderPayload====",orderPayload);
-  
-  // return 
-
-  const order_res = await createOrderAbsoluteRXHelper(orderPayload, template, additional_data)
-  console.log("order_res====",order_res);
-
-  // const create_order_url = `https://portal.absoluterx.com/api/clinics/orders?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
-  // const orderData = {
-  //   patient_id: note["@patientid"],
-  //   physician_id: "1931",
-  //   ship_to_clinic: 0,
-  //   service_type: "two_day",
-  //   signature_required: 1,
-  //   memo: "Test memo",
-  //   // external_id: "testing4",
-  //   products: [
-  //     {
-  //       sku: 14328,
-  //       quantity: 5,
-  //       refills: 1,
-  //       days_supply: 10,
-  //       sig: "Use as directed",
-  //     },
-  //   ],
-  // };
-  // const response = await axios.post(create_order_url, orderPayload, {
-  //   headers: {
-  //     "Content-Type": "application/json",
-  //   },
-  // });
-
-  // console.log("Order Payload:", orderPayload);
-};
-
-
-
-// Helper function to extract product data from fields
-const extractProducts = (fields) => {
-  const products = [];
-  const productGroups = {};
-
-  fields.filter(field => field["@name"] && !field["@name"].startsWith("Unititled")).forEach(field => {
-    const name = field["@name"];
-    const value = field["@value"];
-    const index = name.match(/_(\d+)$/)?.[1];
-
-    if (index) {
-      if (!productGroups[index]) productGroups[index] = {};
-      if (name.includes("sku_no")) productGroups[index].sku = value;
-      if (name.includes("quantity_no")) productGroups[index].quantity = value;
-      if (name.includes("refill_no")) productGroups[index].refills = value || "0";
-      // if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
     }
-  });
-
-  for (const index in productGroups) {
-    products.push({ ...productGroups[index], days_supply: "30" , sig : "Use as directed"});
-  }
-
-  return products;
-};
+  };
+  
+  const processFields = (fieldlist) => {
+    const filteredData = [];
+    fieldlist.forEach(item => {
+      if (item.field && Array.isArray(item.field)) {
+        item.field.forEach(fieldItem => {
+          if (fieldItem['@name'] && !fieldItem['@name'].startsWith('Untitled')) {
+            filteredData.push(fieldItem); 
+          }
+        });
+      }
+    });
+     console.log("filteredData==============================",filteredData)
+    const result = {
+      message: {
+        id: "12345637884" 
+      },
+      order: {
+        prescriber: {
+          npi: filteredData.find(item => item['@name'] === 'npi')?.['@value'] || '',
+          lastName: filteredData.find(item => item['@name'] === 'lastName')?.['@value'] || '',
+          firstName: filteredData.find(item => item['@name'] === 'firstName')?.['@value'] || ''
+        },
+        practice: {
+          id: filteredData.find(item => item['@name'] === 'practice_id')?.['@value'] || '993314' // REQUIRED
+        },
+        patient: {
+          lastName: filteredData.find(item => item['@name'] === 'patient_lastName')?.['@value'] || '',
+          firstName: filteredData.find(item => item['@name'] === 'patient_firstName')?.['@value'] || '',
+          gender: filteredData.find(item => item['@name'] === 'patient_gender')?.['@value'] || 'm', // Optional, default to 'f'
+          dateOfBirth: filteredData.find(item => item['@name'] === 'patient_dob')?.['@value'] || '1980-01-01' // REQUIRED
+        },
+        shipping: {
+          recipientType: filteredData.find(item => item['@name'] === 'shipping_recipientType')?.['@value'] || 'patient',
+          recipientLastName: filteredData.find(item => item['@name'] === 'shipping_recipientLastName')?.['@value'] || '',
+          recipientFirstName: filteredData.find(item => item['@name'] === 'shipping_recipientFirstName')?.['@value'] || '',
+          recipientPhone: filteredData.find(item => item['@name'] === 'shipping_recipientPhone')?.['@value'] || '',
+          recipientEmail: filteredData.find(item => item['@name'] === 'shipping_recipientEmail')?.['@value'] || '',
+          addressLine1: filteredData.find(item => item['@name'] === 'shipping_addressLine1')?.['@value'] || '',
+          city: filteredData.find(item => item['@name'] === 'shipping_city')?.['@value'] || '',
+          state: filteredData.find(item => item['@name'] === 'shipping_state')?.['@value'] || '',
+          zipCode: filteredData.find(item => item['@name'] === 'shipping_zipCode')?.['@value'] || '',
+          country: filteredData.find(item => item['@name'] === 'shipping_country')?.['@value'] || '',
+          //service: filteredData.find(item => item['@name'] === 'shipping_service')?.['@value'] || 2
+        },
+        // billing: {
+        //   payorType: filteredData.find(item => item['@name'] === 'billing_payorType')?.['@value'] || 'pat' // Optional, default to 'pat'
+        // },
+        rxs: [
+          {
+            drugName: filteredData.find(item => item['@name'] === 'Unitialed1')?.['@value'] || "TIRZEPATIDE 20MG/ml (3ML) INJECTION", // REQUIRED
+            drugStrength: filteredData.find(item => item['@name'] === 'drug_strength_1')?.['@value'] || "1ml (2.5mg/ml)", // Optional
+            quantity: filteredData.find(item => item['@name'] === 'drug_quantity_1')?.['@value'] || "1"
+          },
+          {
+            drugName: filteredData.find(item => item['@name'] === 'drug_name_2')?.['@value'] || "SEMAGLUTIDE 10MG/4ML INJECTION", // REQUIRED
+            drugStrength: filteredData.find(item => item['@name'] === 'drug_strength_2')?.['@value'] || "1ml (2.5mg/ml)", // Optional
+            quantity: filteredData.find(item => item['@name'] === 'drug_quantity_2')?.['@value'] || "1"
+          }
+        ]
+      }
+    };
+  
+   console.log(result);
+  };
+//   helendal()

@@ -293,7 +293,98 @@ const handlePatientData = async (note, token, template) => {
     });
     return;
   }
+   
+  if(template.template_name.includes("Hallandale")){
+     let orderSet={
+      message:{
+      },
+      order: {
 
+      }
+     }
+    const ship_to_clinic = filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1";
+    const npi = filteredData.find(item => item['@name'] === 'npi')?.['@value'] || '';
+    if(!npi){
+      await Failed_order.create({
+        template_name: template.template_name,
+        failure_reason: "NPI is not given in advancedmd response. We are using advancedmd GetEhrUpdatedNotes",
+        template_id: template.template_id,
+        note_id: note["@id"],
+        advancedmd_patient_id: note["@patientid"],
+        patient_email: patientData?.email,
+        patient_first_name: patientData?.first_name,
+        patient_last_name: patientData?.last_name,
+      });
+    }
+
+    orderSet.message =  {
+      id: uuidv4()   //REQUIRED
+      // "sentTime": "2024-10-24T12:30:00Z" //OPTIONAL
+    }
+    orderSet.order.practice = {
+      id: 993314  //REQUIRED 
+    }
+    orderSet.order.patient  = {
+      lastName: patientData.last_name,  //REQUIRED
+      firstName:patientData.first_name,  //REQUIRED
+      middleName: patientData.middle_name, //OPTIONAL
+      gender: patientData.gender === "Male" ? "M" : patientData.gender === "Female" ? "F" : "",
+      dateOfBirth: patientData.dob , //REQUIRED
+      address1: patientData.address.street,  //OPTIONAL
+      address2: patientData.address.street2,  //OPTIONAL
+      city:patientData.address.city, //OPTIONAL
+      state: patientData.address.state, //OPTIONAL
+      zip: patientData.address.zip, //OPTIONAL
+      country:  patientData.address.country, //OPTIONAL
+      phoneHome: patientData.phone_number, //OPTIONAL
+      email: patientData.email //OPTIONAL
+    }
+    orderSet.order.shipping = {
+      recipientType: ship_to_clinic, //OPTIONAL
+      recipientLastName: patientData.last_name, //OPTIONAL
+      recipientFirstName: patientData.first_name, //OPTIONAL
+      recipientPhone: patientData.phone_number, //OPTIONAL
+      recipientEmail: patientData.email, //OPTIONAL
+      addressLine1: patientData.address.street, //OPTIONAL
+      city: patientData.address.city, //OPTIONAL
+      state: patientData.address.state, //OPTIONAL
+      zipCode: patientData.address.zip, //OPTIONAL
+      country: patientData.address.country //OPTIONAL
+      //   "service": 2 //OPTIONAL
+    }
+
+    orderSet.order.prescriber = {
+      npi: npi, //REQUIRED
+      //   "licenseState": "CA",  //OPTIONAL
+      //   "licenseNumber": "LIC1234567890",  //OPTIONAL
+      //   "dea": "AB1234567",  //OPTIONAL
+      "lastName": "vishal", //REQUIRED
+      "firstName": "kumar"  //REQUIRED
+      //   "middleName": "A",  //OPTIONAL
+      //   "address1": "123 Main St",  //OPTIONAL
+      //   "address2": "Suite 4B", //OPTIONAL
+      //   "city": "Los Angeles", //OPTIONAL
+      //   "state": "CA", //OPTIONAL
+      //   "zip": "90001", //OPTIONAL
+      //   "phone": "(123) 456-7890", //OPTIONAL
+      //   "fax": "(123) 456-7891", //OPTIONAL
+      //   "email": "mailto:john.smith@example.com" //OPTIONAL
+    }
+  
+    orderSet.order.rxs = extractProductsForLifeFile(note.pagelist.page.fieldlist.field)
+    // [
+    //   {
+    //     drugName: filteredData.find(item => item['@name'] === 'Unitialed1')?.['@value'] || "TIRZEPATIDE 20MG/ml (3ML) INJECTION", // REQUIRED
+    //     drugStrength: filteredData.find(item => item['@name'] === 'drug_strength_1')?.['@value'] || "1ml (2.5mg/ml)", // Optional
+    //     quantity: filteredData.find(item => item['@name'] === 'drug_quantity_1')?.['@value'] || "1"
+    //   },
+    //   {
+    //     drugName: filteredData.find(item => item['@name'] === 'drug_name_2')?.['@value'] || "SEMAGLUTIDE 10MG/4ML INJECTION", // REQUIRED
+    //     drugStrength: filteredData.find(item => item['@name'] === 'drug_strength_2')?.['@value'] || "1ml (2.5mg/ml)", // Optional
+    //     quantity: filteredData.find(item => item['@name'] === 'drug_quantity_2')?.['@value'] || "1"
+    //   }
+    // ]
+  }
   // CHECK OR CREATE PATIENT IN ABSOLUTERX AND LOG IF FAILURE OCCURS
   const absoluteRxData = await checkOrCreatePatientInAbsoluteRX(patientData, template);
   if (!absoluteRxData.status) {
@@ -444,3 +535,37 @@ const extractProducts = (fields) => {
   return products;
 };
 
+const extractProductsForLifeFile = (fields) => {
+  const products = [];
+  const productGroups = {};
+
+  // FILTER THROUGH FIELDS AND ORGANIZE PRODUCT DATA BY INDEX
+  fields
+    .filter(field => field["@name"] && !field["@name"].startsWith("Untitled"))
+    .forEach(field => {
+      const name = field["@name"];
+      const value = field["@value"];
+      const index = name.match(/_(\d+)$/)?.[1]; // EXTRACT INDEX FROM FIELD NAME
+
+      // IF AN INDEX EXISTS, ORGANIZE PRODUCT DATA INTO GROUPS
+      if (index) {
+        if (!productGroups[index]) productGroups[index] = {};
+        if (name.includes("npi")) productGroups[index].npi = value;
+        if (name.includes("sku_no")) productGroups[index].sku = value;
+        if (name.includes("quantity_no")) productGroups[index].quantity = value;
+        if (name.includes("refill_no")) productGroups[index].refills = value || "0";
+        if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
+      }
+    });
+
+  // LOOP THROUGH EACH PRODUCT GROUP, ADDING MISSING DEFAULTS WHERE NECESSARY
+  for (const index in productGroups) {
+    products.push({
+      ...productGroups[index],
+      days_supply: "30",
+      sig: productGroups[index].sig || "Use as directed" // SET DEFAULT SIG IF MISSING
+    });
+  }
+
+  return products;
+};
