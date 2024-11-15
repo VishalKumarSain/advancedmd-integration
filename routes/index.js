@@ -4,6 +4,7 @@ const { updateOrderStatus, updateOrderShipping, createOrder } = require("../cont
 const { createOrderAbsolute, createPhysicianAbsolute, createLicenseAbsolute, createAllergyAbsolute, createDiseasesAbsolute, createMedicationAbsolute, createPatientAbsolute, getPatientAbsolute, getPhysicianAbsolute, getBbsoluteOrder, getAllOrderList, getAllFailedOrderList } = require("../controllers/absoluterx.controller");
 const { fullCreateOrderFlow } = require("../controllers/helper.controller");
 const { full_absolute_create_order_flow } = require("../controllers/newadvancedmd.controller.js");
+const { full_helendal_create_order_flow } = require("../controllers/helendalControllers.js");
 const router = express.Router();
 
 //ADVANCEDMD APIS
@@ -21,7 +22,7 @@ router.get("/patient-search", patientSearch);
 
 
 router.get("/advancedmd-flow", full_absolute_create_order_flow);
-
+router.get("/helendal-flow", full_helendal_create_order_flow);
 // -PATIENT RESPONSE
 
 // -PROVIDER RESPONSE
