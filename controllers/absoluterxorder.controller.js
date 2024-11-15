@@ -76,7 +76,14 @@ const checkOrCreatePatientInAbsoluteRX = async (patientData, template) => {
 const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_data) => {
   try {
 
-    // const check_exists_order_note = await getOrderfromDatabaase()
+    const check_exists_order_note = await getOrderfromDatabaase({notes_id : additional_data.note_id})
+    if(check_exists_order_note){
+      return {
+        status: false,
+        data: null,
+        message: `Order already created on absoluterx not the given note id - ${additional_data.note_id}`,
+      };
+    }
     const create_order_url = `https://portal.absoluterx.com/api/clinics/orders?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
 
     const response = await axios.post(create_order_url, orderPayload, {

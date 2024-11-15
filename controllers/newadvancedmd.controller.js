@@ -372,6 +372,17 @@ const handlePatientData = async (note, token, template) => {
     // SEND ORDER PAYLOAD TO ABSOLUTERX
     const orderResponse = await createOrderAbsoluteRXHelper(orderPayload, template, additional_data);
     console.log("Order response:", orderResponse);
+    if(!orderResponse.status){
+      await Failed_order.create({
+        template_name: template.template_name,
+        failure_reason: orderResponse.message,
+        template_id: template.template_id,
+        advancedmd_patient_id: note["@patientid"],
+        patient_email: patientData?.email,
+        patient_first_name: patientData?.first_name,
+        patient_last_name: patientData?.last_name,
+      });
+    }
   } catch (error) {
     console.error("Failed to create order in AbsoluteRX", error.message);
     await Failed_order.create({
