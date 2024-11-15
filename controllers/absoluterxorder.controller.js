@@ -85,6 +85,8 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
       },
     });
 
+    console.log("response.data===",response.data);
+    
     if (!response?.data?.data) {
       return { status: false, data: null, message: "Order created failed" };
     }
@@ -113,11 +115,13 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
       message: "Order created successfull",
     };
   } catch (error) {
-    console.error("Error creating order:", error.response.data.errors);
+    // console.error("Error creating order:", error?.response?.data?.errors);
+    console.error("Error creating order:", error);
+
     return {
       status: false,
       data: null,
-      message: error.response.data.message || error.response.data.error,
+      message: error?.response?.data?.message || error?.response?.data?.error,
     };
   }
 };

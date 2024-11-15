@@ -10,50 +10,64 @@ exports.full_absolute_create_order_flow = async (req, res) => {
   try {
     // Retrieve token for AdvancedMD API
     // const token = await get_advanced_md_token();
-    const token = "990039ea51d36d7a15450db403c53fffe7bc16dae7160aeb768b9fb61f47604173fcd3";
-    const templates =  await EHR_TEMPLATE.find({template_id : {$in : [100044027]}})
-    console.log("templates====",templates);
-    if(templates.length){
-      // Process each template
-      for (const template of templates) {
-        if(template?.template_id == 100044027 ){// THIS IS ABSOLUTERX TEMPLATE ID
-          console.log("template====",template);
-          await processTemplate(template, token, );
-        }else{
-          const save_failed_order = await Failed_order.create(
-            {
-              template_name: template.template_name,
-              failure_reason: "Template id is not valid",
-              template_id: template.template_id,
+    // RETRIEVE TOKEN FOR ADVANCEDMD API (HARDCODED FOR NOW FOR TESTING)
+        const token = "990039632a3e5ca3ef41c3a402f5c5832b36bdc5ef64e2fc8c9b5104e9732aa2d9554e";
+
+        // FETCH TEMPLATES FROM DATABASE WHERE TEMPLATE ID IS IN THE SPECIFIED ARRAY
+        const templates = await EHR_TEMPLATE.find({ template_id: { $in: [100044027] } });
+        console.log("templates====", templates);
+    
+        // CHECK IF ANY TEMPLATES WERE FOUND
+        if (templates.length) {
+          // PROCESS EACH TEMPLATE IN THE LIST
+          for (const template of templates) {
+            // CHECK IF TEMPLATE ID MATCHES ABSOLUTERX TEMPLATE ID (100044027)
+            if (template?.template_id == 100044027) {
+              console.log("template====", template);
+    
+              // CALL FUNCTION TO PROCESS TEMPLATE DATA
+              await processTemplate(template, token);
+            } else {
+              // LOGIC FOR INVALID TEMPLATE ID: SAVE FAILED ORDER DETAILS TO DATABASE
+              const save_failed_order = await Failed_order.create({
+                template_name: template.template_name,
+                failure_reason: "Template id is not valid",
+                template_id: template.template_id,
+              });
+    
+              // STOP PROCESSING IF TEMPLATE ID IS INVALID
+              return;
             }
-          )
-          return
+          }
         }
+    
+        // SEND SUCCESS RESPONSE IF ALL DATA PROCESSED SUCCESSFULLY
+        return res.status(200).json({ status: true, message: "Data processed successfully" });
+      } catch (error) {
+        // HANDLE ERRORS AND LOG SPECIFIC ERROR MESSAGES FROM RESPONSE IF AVAILABLE
+        console.error("Error:", error.response?.data?.PPMDResults?.Error || error.message);
+    
+        // SEND ERROR RESPONSE WITH GENERIC ERROR MESSAGE
+        return res.status(500).json({ status: false, error: "Data processing failed" });
       }
-    }
+    };
 
-    return res.status(200).json({ status: true, message: "Data processed successfully" });
-  } catch (error) {
-    console.error("Error:", error.response?.data?.PPMDResults?.Error || error.message);
-    return res.status(500).json({ status: false, error: "Data processing failed" });
-  }
-};
-
-// Helper function to process each template
+// HELPER FUNCTION TO PROCESS EACH TEMPLATE
 const processTemplate = async (template, token) => {
+  // PREPARE DATA FOR EHR UPDATE REQUEST AS JSON STRING
   const ehrUpdateData = JSON.stringify({
     ppmdmsg: {
       "@action": "getehrupdatednotes",
       "@class": "api",
-      "@msgtime": new Date().toISOString(),
-      "@templateid": template.template_id,
-      "@datechanged": "2024-10-01",
+      "@msgtime": new Date().toISOString(), // CURRENT DATE AND TIME
+      "@templateid": template.template_id, // USE TEMPLATE ID FROM DATABASE
+      "@datechanged": "2024-10-01", // DATE OF LAST UPDATE REQUESTED
       "@nocookie": "0",
       "patientnote": {
         "@templatename": "TemplateName",
         "@notedatetime": "NoteDatetime",
         "@username": "UserName",
-        "@signedbyuser": "signedbyuser",
+        "@signedbyuser": "signedbyuser", // IDENTIFY WHO SIGNED THE NOTE
         "@patientid": "patientid",
         "@createdat": "CreatedAt",
         "@comments": "Comments",
@@ -84,41 +98,69 @@ const processTemplate = async (template, token) => {
     },
   });
 
+  // CONFIGURATION FOR AXIOS REQUEST TO EHR API
   const ehrConfig = {
     method: "post",
-    maxBodyLength: Infinity,
+    maxBodyLength: Infinity, // ALLOW LARGE REQUEST BODY SIZE
     url: "https://providerapi.advancedmd.com/processrequest/api-801/TEMP/xmlrpc/processrequest.aspx",
     headers: {
-      Cookie: `token=${token}`,
+      Cookie: `token=${token}`, // TOKEN FOR AUTHORIZATION
       "Content-Type": "application/json",
     },
     data: ehrUpdateData,
   };
 
+  // SEND REQUEST TO EHR API AND GET RESPONSE
   const ehrResponse = await axios.request(ehrConfig);
+  console.log("ehrResponse?.data?.PPMDResults?.Error===",ehrResponse?.data?.PPMDResults?.Error);
   
-  if(ehrResponse?.data?.PPMDResults?.Results?.patientnotelist){
-    // console.log("ehrResponse.data.PPMDResults.Results.patientnotelist?.patientnote===",ehrResponse.data.PPMDResults.Results.patientnotelist?.patientnote);
-    const notes = Array.isArray(ehrResponse?.data?.PPMDResults?.Results?.patientnotelist?.patientnote) ? ehrResponse?.data?.PPMDResults?.Results?.patientnotelist?.patientnote : [ehrResponse?.data?.PPMDResults?.Results?.patientnotelist?.patientnote];
-    console.log("notes.length====",notes.length);
-        
-    if(notes && notes?.length){
+
+  // CHECK IF RESPONSE HAS PATIENT NOTES LIST
+  if (ehrResponse?.data?.PPMDResults?.Results?.patientnotelist) {
+    // CHECK IF PATIENT NOTE LIST IS AN ARRAY, IF NOT CONVERT IT TO ARRAY
+    const notes = Array.isArray(ehrResponse?.data?.PPMDResults?.Results?.patientnotelist?.patientnote) 
+      ? ehrResponse?.data?.PPMDResults?.Results?.patientnotelist?.patientnote 
+      : [ehrResponse?.data?.PPMDResults?.Results?.patientnotelist?.patientnote];
+    console.log("notes.length====", notes.length);
+
+    // IF NOTES EXIST AND HAVE LENGTH, PROCESS EACH NOTE
+    if (notes && notes?.length) {
       for (const note of notes) {
-        if (note["@signedbyuser"] && note["@signedbyuser"] !=="") {
-          console.log("note====",note);
-          console.log("note.pagelist.page.fieldlist.field.length====",note.pagelist.page.fieldlist.field.length);
+        // CHECK IF NOTE IS SIGNED BY USER
+        if (note["@signedbyuser"] && note["@signedbyuser"] !== "") {
+          console.log("note====", note);
+          console.log("note.pagelist.page.fieldlist.field.length====", note.pagelist.page.fieldlist.field.length);
+
+          // HANDLE PATIENT DATA BASED ON THE NOTE CONTENT
           await handlePatientData(note, token, template);
         }
       }
-    }else{
-      //IF NO UPDATED NOTES ARE FOUND THEN WE SKIP THIS TEMPLATE AND JUMP TO THE NEXT TEMPLATE
-      return
+    } else {
+      // IF NO UPDATED NOTES FOUND, SKIP THIS TEMPLATE AND MOVE TO THE NEXT
+      return;
     }
   }
 };
 
-// Helper function to handle patient data processing
+// HELPER FUNCTION TO HANDLE PATIENT DATA PROCESSING
 const handlePatientData = async (note, token, template) => {
+  try {
+    
+  
+
+  // CHECK IF PATIENT ID EXISTS IN NOTE; IF NOT, LOG FAILURE AND RETURN
+  if (!note["@patientid"]) {
+    console.log("Patient id not found from advancedmd note");
+    const save_failed_order = await Failed_order.create({
+      template_name: template.template_name,
+      failure_reason: "Patient id not found from advancedmd note",
+      template_id: template.template_id,
+      note_id: note["@id"]
+    });
+    return;
+  }
+
+  // PREPARE REQUEST DATA FOR GETTING DEMOGRAPHIC INFORMATION FROM ADVANCEDMD
   const demographicData = JSON.stringify({
     ppmdmsg: {
       "@action": "getdemographic",
@@ -129,6 +171,7 @@ const handlePatientData = async (note, token, template) => {
     },
   });
 
+  // CONFIGURE AXIOS REQUEST FOR DEMOGRAPHIC DATA
   const demographicConfig = {
     method: "post",
     maxBodyLength: Infinity,
@@ -140,34 +183,52 @@ const handlePatientData = async (note, token, template) => {
     data: demographicData,
   };
 
-  const demographicResponse = await axios.request(demographicConfig);
-  
-  //IF PATIENT NOT FOUND ON ADVANCEDMD THEN WE SAVE THE ERROR AND RETURN THE PROCESS
-  if(!demographicResponse?.data?.PPMDResults?.Results?.patientlist?.patient){
-    // console.log(`Patient not found on advancedmd of patientid - note["@patientid"]`);
-    
-    const save_failed_order = await Failed_order.create(
-      {
-        template_name: template.template_name,
-        failure_reason: `Patient is not found on advancedmd using("getdemographic"). And the patient id was ${note["@patientid"]} `,
-        template_id: template.template_id,
-      }
-    )
-    return
+  // SEND REQUEST TO ADVANCEDMD AND RECEIVE DEMOGRAPHIC RESPONSE
+  let demographicResponse;
+  try {
+    // ATTEMPT TO GET DEMOGRAPHIC DATA
+    demographicResponse = await axios.request(demographicConfig);
+  } catch (error) {
+    console.error("Failed to fetch demographic data", error.message);
+    await Failed_order.create({
+      template_name: template.template_name,
+      failure_reason: "Failed to fetch demographic data: " + error.message,
+      template_id: template.template_id,
+      note_id: note["@id"]
+    });
+    return;
   }
+
+  // IF PATIENT NOT FOUND IN ADVANCEDMD, LOG FAILURE AND RETURN
+  if (!demographicResponse?.data?.PPMDResults?.Results?.patientlist?.patient) {
+    const save_failed_order = await Failed_order.create({
+      template_name: template.template_name,
+      failure_reason: `Patient is not found on advancedmd using("getdemographic"). And the patient id was ${note["@patientid"]} `,
+      template_id: template.template_id,
+      note_id: note["@id"]
+    });
+    return;
+  }
+
+  // EXTRACT PATIENT DATA FROM RESPONSE
   const patient = demographicResponse?.data?.PPMDResults?.Results?.patientlist?.patient;
-  // console.log(" patient.contactinfo===", patient.contactinfo);
+  const numericPhoneNumber = patient.contactinfo["@homephone"].replace(/\D/g, "");
+  const nameParts = patient["@name"].split(",");
+  const lastName = nameParts[0] || "";
+  const firstAndMiddleNames = (nameParts[1] || "").trim().split(" ");
+  const firstName = firstAndMiddleNames[0] || "";
+  const middleName = firstAndMiddleNames.slice(1).join(" ") || "";
   
-   const numericPhoneNumber = patient.contactinfo["@homephone"].replace(/\D/g, "");
+  // ORGANIZE PATIENT DATA IN A STRUCTURED FORMAT
   const patientData = {
-    first_name :patient["@name"].split(",")[1], 
-    middle_name: "",
-    last_name : patient["@name"].split(",")[0],
+    first_name: firstName,
+    middle_name: middleName,
+    last_name: lastName,
     name: patient["@name"],
     email: patient.contactinfo["@email"],
     phone_number: numericPhoneNumber,
     dob: patient["@dob"],
-    gender: patient["@sex"] == "M" ? "Male" : "Female",
+    gender: patient["@sex"] === "M" ? "Male" : patient["@sex"] === "F" ? "Female" : "",
     address: {
       street: patient.address["@address1"],
       street2: patient.address["@address2"],
@@ -178,107 +239,114 @@ const handlePatientData = async (note, token, template) => {
     },
   };
 
-  console.log("patientData===",patientData);
-  
+  console.log("patientData===", patientData);
+
+  // CHECK FOR MISSING DATA IN PATIENT INFORMATION
   let failure_reason = "";
-  if(!patientData.name){
-    failure_reason += "Patient name is not given in advancedmd response. We are using advancedmd 'getdemographic'. "
+  if (!patientData.first_name) {
+    failure_reason += "Patient first_name is not given in advancedmd response. We are using advancedmd 'getdemographic'. ";
+  }
+  if (!patientData.last_name) {
+    failure_reason += "Patient last_name is not given in advancedmd response. We are using advancedmd 'getdemographic'. ";
+  }
+  if (!patientData.email) {
+    failure_reason += "Patient email is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData.phone_number) {
+    failure_reason += "Patient phone number is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData.dob) {
+    failure_reason += "Patient dob is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData.gender) {
+    failure_reason += "Patient gender is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData.address) {
+    failure_reason += "Patient address is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData?.address?.street) {
+    failure_reason += "Patient address street is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData?.address?.city) {
+    failure_reason += "Patient address city is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData?.address?.state) {
+    failure_reason += "Patient address state is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData?.address?.zip) {
+    failure_reason += "Patient address zip is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
+  }
+  if (!patientData?.address?.country) {
+    failure_reason += "Patient address country is not given in advancedmd response. We are using advancedmd 'getdemographic' api. ";
   }
 
-  if(!patientData.email){
-    failure_reason += "Patient email is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
+  // IF ANY REQUIRED DATA IS MISSING, SAVE FAILURE AND RETURN
+  if (failure_reason !== "") {
+    await Failed_order.create({
+      template_name: template.template_name,
+      failure_reason: failure_reason,
+      template_id: template.template_id,
+      note_id: note["@id"],
+      patient_email: patientData?.email,
+      patient_first_name: patientData?.first_name,
+      patient_last_name: patientData?.last_name,
+    });
+    return;
   }
 
-  if(!patientData.phone_number){
-    failure_reason += "Patient phone number is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData.dob){
-    failure_reason += "Patient dob is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData.gender){
-    failure_reason += "Patient gender is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData.address){
-    failure_reason += "Patient address is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData?.address?.street){
-    failure_reason += "Patient address street is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData?.address?.city){
-    failure_reason += "Patient address city is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData?.address?.state){
-    failure_reason += "Patient address state is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData?.address?.zip){
-    failure_reason += "Patient address zip is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-
-  if(!patientData?.address?.country){
-    failure_reason += "Patient address country is not given in advancedmd response. We are using advancedmd 'getdemographic' api. "
-  }
-  
-  if(failure_reason !== ""){
-    const save_failed_order = await Failed_order.create(
-      {
-        template_name: template.template_name,
-        failure_reason: failure_reason,
-        template_id: template.template_id,
-      }
-    )
-    return
-  }
-
+  // CHECK OR CREATE PATIENT IN ABSOLUTERX AND LOG IF FAILURE OCCURS
   const absoluteRxData = await checkOrCreatePatientInAbsoluteRX(patientData, template);
-  // console.log("absoluteRxData====",absoluteRxData);
-  
-  if(!absoluteRxData.status){
-        // Optionally log or store the failed order in a database for further review
-        await Failed_order.create({
-          template_name: template.template_name,
-          failure_reason: absoluteRxData.message,
-          template_id: template.template_id,
-        });
-    return
+  if (!absoluteRxData.status) {
+    await Failed_order.create({
+      template_name: template.template_name,
+      failure_reason: absoluteRxData.message,
+      template_id: template.template_id,
+      note_id: note["@id"],
+      advancedmd_patient_id: note["@patientid"],
+      patient_email: patientData?.email,
+      patient_first_name: patientData?.first_name,
+      patient_last_name: patientData?.last_name,
+    });
+    return;
   }
+
+  // EXTRACT PRODUCT DETAILS FROM NOTE
   const products = extractProducts(note.pagelist.page.fieldlist.field);
-  console.log("products===",products);
-  
-  if(!products.length){
-    // Optionally log or store the failed order in a database for further review
+  console.log("products===", products);
+
+  // IF NO PRODUCTS ARE AVAILABLE, SAVE FAILURE AND RETURN
+  if (!products.length) {
     await Failed_order.create({
       template_name: template.template_name,
       failure_reason: "Products are empty OR not available on advancedmd",
       template_id: template.template_id,
       advancedmd_patient_id: note["@patientid"]
     });
-    return
-}
+    return;
+  }
 
+  // FILTER DATA TO OBTAIN PHYSICIAN ID AND SHIPPING DETAILS
   const filteredData = note.pagelist.page.fieldlist.field.filter(
     item => item['@name'] && !item['@name'].startsWith('Unititled')
   );
-  // console.log("filteredData====",filteredData);
-  const physician_id =  filteredData.find(item => item['@name'] === 'provider_id')?.['@value'] || ''
-  const ship_to_clinic=  filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1"
+  const physician_id = filteredData.find(item => item['@name'] === 'provider_id')?.['@value'] || '';
+  const ship_to_clinic = filteredData.find(item => item['@name'] === 'ship_to')?.['@value'] === 'Patient' ? "0" : "1";
 
-
-  if(!physician_id || physician_id==""){
+  // IF PHYSICIAN ID IS MISSING, SAVE FAILURE AND RETURN
+  if (!physician_id || physician_id == "") {
     await Failed_order.create({
       template_name: template.template_name,
       failure_reason: "Physician id is not given by advancedmd response. We are using advancedmd 'GetEhrUpdatedNotes' api",
       template_id: template.template_id,
-      advancedmd_patient_id: note["@patientid"]
+      advancedmd_patient_id: note["@patientid"],
+      patient_email: patientData?.email,
+      patient_first_name: patientData?.first_name,
+      patient_last_name: patientData?.last_name,
     });
-    return
+    return;
   }
+
+  // PREPARE ORDER PAYLOAD FOR ABSOLUTERX
   const orderPayload = {
     patient_id: absoluteRxData.data.id,
     physician_id,
@@ -288,76 +356,80 @@ const handlePatientData = async (note, token, template) => {
     memo: "Test memo",
     external_id: uuidv4(),
     products: products,
-    
   };
 
-
+  // ADDITIONAL DATA FOR LOGGING OR TRACKING PURPOSES
   const additional_data = {
-    template_id : template.template_id,
-    note_id : note["@id"],
+    template_id: template.template_id,
+    note_id: note["@id"],
     advancedmd_patient_id: note["@patientid"]
+  };
+  console.log("additional_data====", additional_data);
+
+  console.log("orderPayload====", orderPayload);
+
+  try {
+    // SEND ORDER PAYLOAD TO ABSOLUTERX
+    const orderResponse = await createOrderAbsoluteRXHelper(orderPayload, template, additional_data);
+    console.log("Order response:", orderResponse);
+  } catch (error) {
+    console.error("Failed to create order in AbsoluteRX", error.message);
+    await Failed_order.create({
+      template_name: template.template_name,
+      failure_reason: "Error creating order: " + error.message,
+      template_id: template.template_id,
+      advancedmd_patient_id: note["@patientid"],
+      patient_email: patientData?.email,
+      patient_first_name: patientData?.first_name,
+      patient_last_name: patientData?.last_name,
+    });
   }
-  console.log("additional_data====",additional_data);
 
-  console.log("orderPayload====",orderPayload);
-  
-  // return 
-
-  const order_res = await createOrderAbsoluteRXHelper(orderPayload, template, additional_data)
-  console.log("order_res====",order_res);
-
-  // const create_order_url = `https://portal.absoluterx.com/api/clinics/orders?api_key=${process.env.ABSOLUTE_RX_API_KEY}`;
-  // const orderData = {
-  //   patient_id: note["@patientid"],
-  //   physician_id: "1931",
-  //   ship_to_clinic: 0,
-  //   service_type: "two_day",
-  //   signature_required: 1,
-  //   memo: "Test memo",
-  //   // external_id: "testing4",
-  //   products: [
-  //     {
-  //       sku: 14328,
-  //       quantity: 5,
-  //       refills: 1,
-  //       days_supply: 10,
-  //       sig: "Use as directed",
-  //     },
-  //   ],
-  // };
-  // const response = await axios.post(create_order_url, orderPayload, {
-  //   headers: {
-  //     "Content-Type": "application/json",
-  //   },
-  // });
-
-  // console.log("Order Payload:", orderPayload);
+} catch (error) {
+  console.error("Unexpected error in handlePatientData", error.message);
+  await Failed_order.create({
+    template_name: template.template_name,
+    failure_reason: "Unexpected error: " + error.message,
+    template_id: template.template_id,
+    note_id: note["@id"]
+  });
+}
 };
 
 
 
-// Helper function to extract product data from fields
+
 const extractProducts = (fields) => {
   const products = [];
   const productGroups = {};
 
-  fields.filter(field => field["@name"] && !field["@name"].startsWith("Unititled")).forEach(field => {
-    const name = field["@name"];
-    const value = field["@value"];
-    const index = name.match(/_(\d+)$/)?.[1];
+  // FILTER THROUGH FIELDS AND ORGANIZE PRODUCT DATA BY INDEX
+  fields
+    .filter(field => field["@name"] && !field["@name"].startsWith("Unititled"))
+    .forEach(field => {
+      const name = field["@name"];
+      const value = field["@value"];
+      const index = name.match(/_(\d+)$/)?.[1]; // EXTRACT INDEX FROM FIELD NAME
 
-    if (index) {
-      if (!productGroups[index]) productGroups[index] = {};
-      if (name.includes("sku_no")) productGroups[index].sku = value;
-      if (name.includes("quantity_no")) productGroups[index].quantity = value;
-      if (name.includes("refill_no")) productGroups[index].refills = value || "0";
-      // if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
-    }
-  });
+      // IF AN INDEX EXISTS, ORGANIZE PRODUCT DATA INTO GROUPS
+      if (index) {
+        if (!productGroups[index]) productGroups[index] = {};
+        if (name.includes("sku_no")) productGroups[index].sku = value;
+        if (name.includes("quantity_no")) productGroups[index].quantity = value;
+        if (name.includes("refill_no")) productGroups[index].refills = value || "0";
+        if (name.includes("instructions_no")) productGroups[index].sig = value || "Use as directed";
+      }
+    });
 
+  // LOOP THROUGH EACH PRODUCT GROUP, ADDING MISSING DEFAULTS WHERE NECESSARY
   for (const index in productGroups) {
-    products.push({ ...productGroups[index], days_supply: "30" , sig : "Use as directed"});
+    products.push({
+      ...productGroups[index],
+      days_supply: "30",
+      sig: productGroups[index].sig || "Use as directed" // SET DEFAULT SIG IF MISSING
+    });
   }
 
   return products;
 };
+

@@ -14,6 +14,26 @@ const failed_order_schema = new Schema(
       type: String,
       required: false,
     },
+    absolute_patient_id: {
+      type: String,
+      required: false,
+    },
+    physician_id: {
+      type: String,
+      required: false,
+    },
+    patient_first_name: {
+      type: String,
+      required: false,
+    },
+    patient_last_name: {
+      type: String,
+      required: false,
+    },
+    patient_email: {
+      type: String,
+      required: false,
+    },
     failure_reason: {
       type: String,
       default: "",
