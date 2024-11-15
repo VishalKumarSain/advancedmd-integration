@@ -135,7 +135,7 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
         .join(', '); // COMBINES ALL MESSAGES INTO A SINGLE STRING
     
       console.log("mergedErrors",mergedErrors);
-      error?.response?.data?.message = mergedErrors
+      error.response.data.message = mergedErrors
     }
     
     return {
