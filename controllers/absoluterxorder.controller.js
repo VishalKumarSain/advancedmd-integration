@@ -101,6 +101,7 @@ const createOrderAbsoluteRXHelper = async (orderPayload, template, additional_da
 
     const data_res = response?.data?.data;
     const local_db_data = {
+      template_name : template.template_name,
       frist_name: data_res.patient.first_name,
       last_name: data_res.patient.last_name,
       email: data_res.patient.email,
